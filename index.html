@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flowbill CRM — ศูนย์กลางงานขาย</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="fix.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#dashboard"><span class="brand-mark">F</span><span>Flowbill <b>CRM</b></span></a>
+        <div class="workspace"><span class="avatar">N</span><span><strong>Northstar Co., Ltd.</strong><small>พื้นที่ทำงานหลัก</small></span><span class="chevron">⌄</span></div>
+        <nav>
+          <p>ภาพรวม</p>
+          <button class="nav-link active" data-page="dashboard"><span>▦</span>แดชบอร์ด</button>
+          <p>งานขาย</p>
+          <button class="nav-link" data-page="quotations"><span>▧</span>ใบเสนอราคา</button>
+          <button class="nav-link" data-page="invoices"><span>▤</span>ใบวางบิล</button>
+          <button class="nav-link" data-page="customers"><span>♙</span>ลูกค้า</button>
+          <p>คลังข้อมูล</p>
+          <button class="nav-link" data-page="products"><span>▱</span>สินค้าและราคา</button>
+          <button class="nav-link" data-page="settings"><span>⚙</span>ตั้งค่า</button>
+        </nav>
+        <div class="sidebar-note"><span>✦</span><p><b>พร้อมเชื่อมต่อฐานข้อมูล</b><br />รุ่นนี้บันทึกข้อมูลในเบราว์เซอร์</p></div>
+      </aside>
+      <main>
+        <header><div><p class="eyebrow" id="breadcrumb">ภาพรวม</p><h1 id="page-title">สวัสดี, ทีม Northstar</h1></div><div class="header-actions"><button class="icon-button" aria-label="การแจ้งเตือน">♢</button><button class="primary" id="new-action">+ สร้างใบเสนอราคา</button></div></header>
+        <section id="dashboard" class="page active-page">
+          <div class="period"><span>ภาพรวมเดือนกันยายน 2569</span><button class="ghost">เดือนนี้ ⌄</button></div>
+          <div class="stats">
+            <article><div class="stat-icon mint">↗</div><p>ยอดเสนอราคา</p><h2>฿ 482,600</h2><small class="up">↑ 12.5% <i>เทียบเดือนก่อน</i></small></article>
+            <article><div class="stat-icon violet">▤</div><p>รอชำระ</p><h2>฿ 124,800</h2><small><b>4</b> ใบวางบิล</small></article>
+            <article><div class="stat-icon amber">♙</div><p>ลูกค้าใหม่</p><h2>18</h2><small class="up">↑ 4 ราย <i>เทียบเดือนก่อน</i></small></article>
+            <article><div class="stat-icon sky">▱</div><p>สินค้าที่ขาย</p><h2>36</h2><small>จาก <b>84</b> รายการ</small></article>
+          </div>
+          <div class="content-grid">
+            <article class="panel revenue"><div class="panel-title"><div><h3>ยอดขายรายเดือน</h3><p>ยอดขายที่ยืนยันแล้ว</p></div><button class="ghost">2569 ⌄</button></div><div class="chart"><div class="y-axis"><span>500k</span><span>375k</span><span>250k</span><span>125k</span><span>0</span></div><div class="bars"><i style="height:26%"></i><i style="height:42%"></i><i style="height:35%"></i><i style="height:58%"></i><i style="height:49%"></i><i style="height:70%"></i><i style="height:82%"></i><i style="height:62%"></i><i style="height:77%"></i></div><div class="months"><span>ม.ค.</span><span>ก.พ.</span><span>มี.ค.</span><span>เม.ย.</span><span>พ.ค.</span><span>มิ.ย.</span><span>ก.ค.</span><span>ส.ค.</span><span>ก.ย.</span></div></div></article>
+            <article class="panel tasks"><div class="panel-title"><div><h3>ต้องดำเนินการ</h3><p>รายการที่ควรดูแลวันนี้</p></div><button class="text-button" data-page-go="quotations">ดูทั้งหมด</button></div><div class="task"><span class="dot orange"></span><div><b>QT-2026-0042 ใกล้หมดอายุ</b><p>บริษัท สยามรีเทล จำกัด · ภายใน 2 วัน</p></div><span>›</span></div><div class="task"><span class="dot purple"></span><div><b>BL-2026-0018 ครบกำหนดชำระ</b><p>หจก. ไทยแพ็ค · วันนี้</p></div><span>›</span></div><div class="task"><span class="dot blue"></span><div><b>ลูกค้าใหม่รอติดต่อกลับ</b><p>บริษัท โมเดิร์น ลิฟวิ่ง จำกัด</p></div><span>›</span></div></article>
+          </div>
+          <article class="panel recent"><div class="panel-title"><div><h3>ใบเสนอราคาล่าสุด</h3><p>เอกสารที่สร้างหรือแก้ไขล่าสุด</p></div><button class="text-button" data-page-go="quotations">ดูทั้งหมด</button></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>วันที่</th><th>ยอดรวม</th><th>สถานะ</th><th></th></tr></thead><tbody id="recent-quotation-body"></tbody></table></article>
+        </section>
+        <section id="customers" class="page"><div class="page-toolbar"><div class="search">⌕ <input id="customer-search" placeholder="ค้นหาชื่อ, บริษัท, เลขผู้เสียภาษี" /></div><button class="primary" id="add-customer">+ เพิ่มลูกค้า</button></div><article class="panel table-panel"><div class="panel-title"><div><h3>ลูกค้าทั้งหมด</h3><p id="customer-count">0 ราย</p></div><button class="ghost">กรอง ⌄</button></div><table><thead><tr><th>ลูกค้า</th><th>เลขผู้เสียภาษี</th><th>โทรศัพท์</th><th>เครดิตเทอม</th><th>ยอดขายสะสม</th><th></th></tr></thead><tbody id="customer-body"></tbody></table></article></section>
+        <section id="products" class="page"><div class="page-toolbar"><div class="search">⌕ <input id="product-search" placeholder="ค้นหาสินค้าหรือรหัสสินค้า" /></div><button class="primary" id="add-product">+ เพิ่มสินค้า</button></div><article class="panel table-panel"><div class="panel-title"><div><h3>สินค้าและขนาด</h3><p>ราคาแสดงก่อน VAT</p></div><button class="ghost">หมวดสินค้าทั้งหมด ⌄</button></div><table><thead><tr><th>รหัสสินค้า</th><th>รายการสินค้า</th><th>ขนาด / สเปก</th><th>ราคาขาย</th><th>สถานะ</th><th></th></tr></thead><tbody id="product-body"></tbody></table></article></section>
+        <section id="quotations" class="page"><div class="page-toolbar"><div class="tabs"><button class="tab active">ทั้งหมด</button><button class="tab">ร่าง</button><button class="tab">รออนุมัติ</button><button class="tab">อนุมัติแล้ว</button></div><button class="primary" id="add-quotation">+ สร้างใบเสนอราคา</button></div><article class="panel table-panel"><div class="panel-title"><div><h3>ใบเสนอราคา</h3><p>จัดการเอกสารเสนอราคาทั้งหมด</p></div><div class="search small">⌕ <input placeholder="ค้นหาเอกสาร" /></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>วันที่ออก</th><th>หมดอายุ</th><th>ยอดรวม</th><th>สถานะ</th><th></th></tr></thead><tbody id="quotation-body"></tbody></table></article></section>
+        <section id="invoices" class="page"><div class="empty-state"><div class="empty-icon">▤</div><h2>ใบวางบิลจะอยู่ที่นี่</h2><p>เมื่อใบเสนอราคาได้รับการอนุมัติ คุณจะสร้างใบวางบิลและติดตามการชำระเงินได้จากหน้านี้</p><button class="primary" data-page-go="quotations">ไปที่ใบเสนอราคา</button></div></section>
+        <section id="settings" class="page"><article class="panel settings-card"><h3>การเชื่อมต่อฐานข้อมูล</h3><p>ขณะนี้รุ่นต้นแบบใช้ Local Storage ในเบราว์เซอร์ การเชื่อม Supabase จะทำให้ทีมใช้งานข้อมูลร่วมกัน มีระบบล็อกอิน และเก็บเอกสารอย่างปลอดภัย</p><div class="setting-row"><div><b>สถานะฐานข้อมูล</b><small>ยังไม่ได้เชื่อมต่อ Supabase</small></div><span class="badge draft">รอตั้งค่า</span></div><div class="setting-row"><div><b>ข้อมูลบริษัท</b><small>Northstar Co., Ltd. · ผู้ประกอบการจด VAT</small></div><button class="text-button">แก้ไข</button></div></article></section>
+      </main>
+    </div>
+    <dialog id="modal"><form method="dialog" id="modal-form"><button class="modal-close" value="cancel">×</button><div id="modal-content"></div></form></dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
