@@ -184,6 +184,16 @@
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
     <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
     document.body.append(preview);
+    const downloadButton = document.createElement('button');
+    downloadButton.type = 'button'; downloadButton.textContent = 'ดาวน์โหลด PDF';
+    preview.querySelector('.print-tools').prepend(downloadButton);
+    preview.querySelector('.print-tools span').textContent = 'ดาวน์โหลดไฟล์ PDF ได้โดยตรง หรือเลือกพิมพ์';
+    downloadButton.onclick = async () => {
+      downloadButton.disabled = true;
+      try { await window.downloadSalesPDF(company, doc, items); }
+      catch (error) { alert('ดาวน์โหลด PDF ไม่สำเร็จ: ' + error.message); }
+      finally { downloadButton.disabled = false; }
+    };
     const previousTitle = document.title;
     preview.querySelector('[data-print-close]').onclick = () => { preview.remove(); document.title = previousTitle; };
     preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
