@@ -1,9 +1,9 @@
 (() => {
-  const labels={all:'ทั้งหมด',draft:'ร่าง',sent:'รออนุมัติ',approved:'อนุมัติแล้ว'};
-  const statusOf=quote=>quote.statusCode||({'ร่าง':'draft','รออนุมัติ':'sent','อนุมัติแล้ว':'approved','ยกเลิก':'cancelled'}[quote.status])||quote.status;
+  const labels={all:'ทั้งหมด',sent:'รออนุมัติ',approved:'อนุมัติแล้ว'};
+  const statusOf=quote=>{const status=quote.statusCode||({'ร่าง':'draft','รออนุมัติ':'sent','อนุมัติแล้ว':'approved','ยกเลิก':'cancelled'}[quote.status])||quote.status;return status==='draft'?'sent':status;};
   const select=(quotes,status='all',query='')=>{
     const term=String(query).trim().toLocaleLowerCase('th-TH');
-    const counts={all:quotes.length,draft:0,sent:0,approved:0};
+    const counts={all:quotes.length,sent:0,approved:0};
     quotes.forEach(q=>{const key=statusOf(q);if(key!=='all'&&Object.hasOwn(counts,key))counts[key]++;});
     const rows=quotes.filter(q=>(status==='all'||statusOf(q)===status)&&(!term||[q.no,q.customer].some(value=>String(value??'').toLocaleLowerCase('th-TH').includes(term))));
     return {counts,rows};
@@ -11,7 +11,11 @@
   const mount=(root,getQuotes)=>{
     let current='all';
     const tabs=[...root.querySelectorAll('.tabs .tab')],search=root.querySelector('.search input'),body=root.querySelector('#quotation-body');
-    tabs.forEach((tab,i)=>{tab.dataset.quotationFilter=Object.keys(labels)[i];tab.type='button';});
+    // Rebuild the existing toolbar, including when older HTML still has a draft tab.
+    tabs.forEach(tab=>tab.remove());
+    tabs.length=0;
+    const toolbar=root.querySelector('.tabs');
+    Object.keys(labels).forEach(key=>{const tab=document.createElement('button');tab.className='tab';tab.dataset.quotationFilter=key;tab.type='button';toolbar.append(tab);tabs.push(tab);});
     search.setAttribute('aria-label','ค้นหาใบเสนอราคาด้วยเลขที่เอกสารหรือชื่อลูกค้า');
     search.placeholder='ค้นหาเลขที่เอกสาร / ลูกค้า';
     const apply=()=>{

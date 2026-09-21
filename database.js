@@ -61,7 +61,7 @@
   };
   const syncQuotations = async () => {
     const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=id,document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
-    const status = { draft: 'ร่าง', sent: 'รออนุมัติ', approved: 'อนุมัติแล้ว', cancelled: 'ยกเลิก' };
+    const status = { draft: 'รออนุมัติ', sent: 'รออนุมัติ', approved: 'อนุมัติแล้ว', cancelled: 'ยกเลิก' };
     const thaiDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
     state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, status: status[quote.status] || quote.status }));
   };
