@@ -58,7 +58,7 @@
     const widths=[50,550,100,130,90,154],xs=[L];widths.forEach(w=>xs.push(xs.at(-1)+w));
     const tableHeader=()=>{text('รายการสินค้า / ขนาด',L,y,20,true);text(items.length+' รายการ',R,y,16,false,'right',MUTED);y+=37;tableTop=y;
       widths.forEach((w,i)=>rect(xs[i],y,w,64,'#f0f3f5'));line(L,y,R,y,INK,3);
-      [['ลำดับ','NO.'],['รายการสินค้า / ขนาด','DESCRIPTION / SIZE'],['จำนวน','QTY / UNIT'],['ราคาต่อหน่วย','UNIT PRICE'],['ลด (%)','DISCOUNT'],['จำนวนเงิน','AMOUNT']].forEach(([th,en],i)=>{text(th,i===1?xs[i]+14:xs[i]+widths[i]/2,y+11,16,true,i===1?'left':'center');text(en,i===1?xs[i]+14:xs[i]+widths[i]/2,y+36,12,false,i===1?'left':'center',MUTED);});y+=64;};
+      [['ลำดับ','NO.'],['รายการสินค้า / ขนาด','DESCRIPTION / SIZE'],['จำนวน','QTY / UNIT'],['ราคาต่อหน่วย','UNIT PRICE'],['ลด (%)','DISCOUNT'],['จำนวนเงิน','AMOUNT']].forEach(([th,en],i)=>{const center=xs[i]+widths[i]/2;text(th,center,y+11,16,true,'center');text(en,center,y+36,12,false,'center',MUTED);});y+=64;};
     start();tableHeader();
     items.forEach((item,index)=>{
       const gross=Number(item.quantity)*Number(item.unit_price);
