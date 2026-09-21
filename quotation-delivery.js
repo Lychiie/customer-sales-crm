@@ -2,6 +2,19 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const canIssue = quote => Boolean(quote?.id && quote.statusCode === 'approved');
   const pending = new Map();
+  // Read saved links, never issue a document just to view it.
+  const loadLinked = async (request, org, quoteId) => {
+    if (!org) throw Error('ไม่พบองค์กร กรุณาเข้าสู่ระบบใหม่');
+    const linked = new Map();
+    const limit = 500;
+    for (let offset = 0; ; offset += limit) {
+      const filter = quoteId ? `eq.${encodeURIComponent(quoteId)}` : 'not.is.null';
+      const rows = await request(`/rest/v1/delivery_notes?organization_id=eq.${encodeURIComponent(org)}&source_quotation_id=${filter}&select=id,organization_id,source_quotation_id,document_number&order=id.asc&limit=${limit}&offset=${offset}`);
+      if (!Array.isArray(rows) || rows.some(row => !row.id || !row.document_number || !row.source_quotation_id || row.organization_id !== org || (quoteId && row.source_quotation_id !== quoteId))) throw Error('โหลดข้อมูลใบส่งสินค้าไม่สำเร็จ กรุณาลองใหม่');
+      rows.forEach(row => linked.set(row.source_quotation_id, row));
+      if (rows.length < limit) return linked;
+    }
+  };
   const prepare = async (request, org, quote) => {
     if (!org || !canIssue(quote)) throw Error('ออกใบส่งสินค้าได้เฉพาะใบเสนอราคาที่อนุมัติแล้ว');
     const source = (await request(`/rest/v1/documents?organization_id=eq.${encodeURIComponent(org)}&id=eq.${encodeURIComponent(quote.id)}&kind=eq.quotation&select=*&limit=1`))[0];
@@ -58,5 +71,5 @@
     };
     document.body.append(dialog);dialog.showModal();
   };
-  window.QuotationDelivery={canIssue,prepare,issue,open};
+  window.QuotationDelivery={canIssue,loadLinked,prepare,issue,open};
 })();

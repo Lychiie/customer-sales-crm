@@ -19,6 +19,7 @@
   let session = JSON.parse(localStorage.getItem('flowbill-session') || 'null');
   let orgId = localStorage.getItem('flowbill-org-id');
   let quotationTaxInvoices = new Map();
+  let quotationDeliveryNotes = new Map();
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
     const response = await fetch(config.url + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
@@ -104,7 +105,8 @@
   });
   const syncAll = async () => {
     await loadOrganization();
-    await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]);
+    await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
+      window.QuotationDelivery.loadLinked(request, orgId).then(links => { quotationDeliveryNotes = links; })]);
     state.quotations.forEach(quote => {
       quote.taxInvoiceNumber = quotationTaxInvoices.get(quote.id)?.document_number || null;
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
@@ -345,11 +347,14 @@
     document.querySelectorAll('#quotation-body tr').forEach(row=>{
       const quote=state.quotations.find(q=>q.no===row.cells[0]?.textContent.trim());
       const existing=row.querySelector('[data-quotation-delivery]');
-      if(!window.QuotationDelivery.canIssue(quote)){existing?.remove();return;}
-      if(existing)return;
-      const action=document.createElement('button');action.type='button';action.className='ghost';
-      action.dataset.quotationDelivery=quote.id;action.textContent='ออกใบส่งสินค้า';action.disabled=openingDelivery.has(quote.id);
-      row.lastElementChild.prepend(action);
+      const linked=quotationDeliveryNotes.get(quote?.id);
+      if(!linked && !window.QuotationDelivery.canIssue(quote)){existing?.remove();return;}
+      const action=existing || document.createElement('button');action.type='button';action.className='ghost';
+      action.dataset.quotationDelivery=quote.id;
+      const text=linked ? 'ดูใบส่งสินค้า' : 'ออกใบส่งสินค้า';
+      if(action.textContent!==text)action.textContent=text;
+      action.disabled=openingDelivery.has(quote.id);
+      if(!existing)row.lastElementChild.prepend(action);
     });
     document.querySelectorAll('#quotation-body tr').forEach(row => {
       const quote = state.quotations.find(q => q.no === row.cells[0]?.textContent.trim());
@@ -398,9 +403,20 @@
     if(!session||!orgId)return login();
     const id=action.dataset.quotationDelivery;if(openingDelivery.has(id))return;
     const quote=state.quotations.find(q=>q.id===id);openingDelivery.add(id);action.disabled=true;
-    try{await window.QuotationDelivery.open(request,orgId,quote,async result=>{
-      window.go?.('delivery-notes');await window.DeliveryNotes.openSaved(request,orgId,result.id);
-    });}catch(error){alert(error.message);}finally{openingDelivery.delete(id);action.disabled=false;}
+    try{
+      // Refresh the exact link so another tab's newly issued note opens directly too.
+      const linked=(await window.QuotationDelivery.loadLinked(request,orgId,id)).get(id);
+      if(linked){
+        quotationDeliveryNotes.set(id,linked);addPrintButtons();
+        window.go?.('delivery-notes');await window.DeliveryNotes.openSaved(request,orgId,linked.id);
+        return;
+      }
+      quotationDeliveryNotes.delete(id);
+      await window.QuotationDelivery.open(request,orgId,quote,async result=>{
+        quotationDeliveryNotes.set(id,result);addPrintButtons();
+        window.go?.('delivery-notes');await window.DeliveryNotes.openSaved(request,orgId,result.id);
+      });
+    }catch(error){alert(error.message);}finally{openingDelivery.delete(id);addPrintButtons();}
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
   if (['#quotations', '#settings', '#tax-invoices', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
