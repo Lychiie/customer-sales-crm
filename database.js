@@ -35,7 +35,7 @@
   };
   const syncBillingNotes = async () => {
     const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.billing_note&select=document_number,customer_name_snapshot,grand_total,status&order=created_at.desc`);
-    document.querySelector('#invoices').innerHTML = `<section class="page active-page"><div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${bill.status === 'draft' ? 'ร่าง' : bill.status}</td></tr>`).join('')}</tbody></table></article></section>`;
+    document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${bill.status === 'draft' ? 'ร่าง' : bill.status}</td></tr>`).join('')}</tbody></table></article>`;
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row, index) => {
     const quote = state.quotations[index]; if (!quote) return;
