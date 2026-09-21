@@ -1,5 +1,5 @@
 // Render Thai text using the browser's fonts, then embed each A4 page in a PDF.
-window.downloadSalesPDF = async (company, doc, items) => {
+window.buildSalesPDF = async (company, doc, items) => {
   await document.fonts.ready;
   const pages = [];
   let canvas, ctx, y;
@@ -75,7 +75,10 @@ window.downloadSalesPDF = async (company, doc, items) => {
   append(`xref\n0 ${count}\n0000000000 65535 f \n`);
   for (let id = 1; id < count; id++) append(`${String(offsets[id]).padStart(10, '0')} 00000 n \n`);
   append(`trailer\n<< /Size ${count} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
-  const url = URL.createObjectURL(new Blob(chunks, { type: 'application/pdf' }));
-  const link = document.createElement('a'); link.href = url; link.download = `${doc.document_number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  const blob = new Blob(chunks, { type: 'application/pdf' });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader(); reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('ไม่สามารถเตรียมไฟล์ PDF')); reader.readAsDataURL(blob);
+  });
+  return { blob, dataUrl, filename: `${doc.document_number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf` };
 };

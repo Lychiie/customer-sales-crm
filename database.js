@@ -36,7 +36,8 @@
       event.preventDefault();
       const data = Object.fromEntries(new FormData(event.currentTarget));
       try {
-        await request(`/rest/v1/organizations?id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ name: data.name, tax_id: data.taxId || null, address: data.address || null, vat_rate: Number(data.vatRate) || 0 }) });
+        const saved = await request(`/rest/v1/organizations?id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: data.name.trim(), tax_id: data.taxId.trim() || null, address: data.address.trim() || null, vat_rate: Number(data.vatRate) || 0 }) });
+        if (!Array.isArray(saved) || saved.length !== 1) throw new Error('ยังไม่ได้บันทึก: บัญชีนี้ไม่มีสิทธิ์แก้ข้อมูลบริษัท กรุณาใช้บัญชีผู้ดูแล');
         await syncCompanyProfile();
         alert('บันทึกข้อมูลบริษัทแล้ว');
       } catch (error) { alert(error.message); }
@@ -184,18 +185,30 @@
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
     <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
     document.body.append(preview);
-    const downloadButton = document.createElement('button');
-    downloadButton.type = 'button'; downloadButton.textContent = 'ดาวน์โหลด PDF';
-    preview.querySelector('.print-tools').prepend(downloadButton);
-    preview.querySelector('.print-tools span').textContent = 'ดาวน์โหลดไฟล์ PDF ได้โดยตรง หรือเลือกพิมพ์';
-    downloadButton.onclick = async () => {
-      downloadButton.disabled = true;
-      try { await window.downloadSalesPDF(company, doc, items); }
-      catch (error) { alert('ดาวน์โหลด PDF ไม่สำเร็จ: ' + error.message); }
-      finally { downloadButton.disabled = false; }
-    };
+    const downloadLink = document.createElement('a');
+    downloadLink.textContent = 'กำลังเตรียม PDF…';
+    downloadLink.style.cssText = 'display:inline-block;padding:10px 16px;background:#24344e;color:white;border-radius:6px;text-decoration:none';
+    preview.querySelector('.print-tools').prepend(downloadLink);
+    const downloadStatus = preview.querySelector('.print-tools span');
+    downloadStatus.setAttribute('role', 'status');
+    downloadStatus.textContent = 'กำลังเตรียมไฟล์สำหรับดาวน์โหลด';
+    try {
+      const pdf = await window.buildSalesPDF(company, doc, items);
+      if (!preview.isConnected) return;
+      downloadLink.href = pdf.dataUrl;
+      downloadLink.download = pdf.filename;
+      downloadLink.textContent = 'ดาวน์โหลด PDF';
+      downloadStatus.textContent = 'ไฟล์พร้อมแล้ว กดดาวน์โหลด PDF เพื่อบันทึก';
+      downloadLink.onclick = () => { downloadStatus.textContent = 'ส่งคำขอดาวน์โหลดแล้ว หากไม่มีไฟล์ ให้เลือกเปิดไฟล์ PDF'; };
+      const openLink = document.createElement('a');
+      const pdfUrl = URL.createObjectURL(pdf.blob);
+      openLink.href = pdfUrl; openLink.target = '_blank'; openLink.rel = 'noopener'; openLink.textContent = 'เปิดไฟล์ PDF';
+      openLink.style.cssText = downloadLink.style.cssText;
+      downloadLink.after(openLink);
+      preview.addEventListener('pdf-close', () => setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000), { once: true });
+    } catch (error) { downloadLink.textContent = 'เตรียม PDF ไม่สำเร็จ'; downloadStatus.textContent = error.message; }
     const previousTitle = document.title;
-    preview.querySelector('[data-print-close]').onclick = () => { preview.remove(); document.title = previousTitle; };
+    preview.querySelector('[data-print-close]').onclick = () => { preview.dispatchEvent(new Event('pdf-close')); preview.remove(); document.title = previousTitle; };
     preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
     preview.querySelector('[data-print-now]').focus();
   };
