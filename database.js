@@ -27,6 +27,21 @@
       return { id: variant.id, sku: variant.sku || product.code, name: product.name, size: variant.label, price: Number(price).toFixed(2), status: product.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' };
     }));
   };
+  const syncCompanyProfile = async () => {
+    const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,vat_rate&limit=1`))[0];
+    if (!organization) return;
+    const settings = document.querySelector('#settings');
+    settings.innerHTML = `<article class="panel settings-card"><h3>ข้อมูลบริษัท</h3><p>ข้อมูลนี้จะแสดงบนใบเสนอราคา ใบวางบิล และใบกำกับภาษี</p><form id="company-profile-form"><label class="field"><span>ชื่อบริษัท</span><input name="name" required value="${organization.name || ''}"></label><label class="field"><span>เลขประจำตัวผู้เสียภาษี</span><input name="taxId" value="${organization.tax_id || ''}" placeholder="13 หลัก"></label><label class="field"><span>ที่อยู่บริษัท</span><textarea name="address" rows="3" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">${organization.address || ''}</textarea></label><label class="field"><span>อัตรา VAT (%)</span><input name="vatRate" type="number" min="0" max="100" step="0.01" value="${organization.vat_rate ?? 7}"></label><div class="form-actions"><button class="primary" type="submit">บันทึกข้อมูลบริษัท</button></div></form></article>`;
+    settings.querySelector('#company-profile-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.currentTarget));
+      try {
+        await request(`/rest/v1/organizations?id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ name: data.name, tax_id: data.taxId || null, address: data.address || null, vat_rate: Number(data.vatRate) || 0 }) });
+        await syncCompanyProfile();
+        alert('บันทึกข้อมูลบริษัทแล้ว');
+      } catch (error) { alert(error.message); }
+    });
+  };
   const syncQuotations = async () => {
     const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
     const status = { draft: 'ร่าง', sent: 'รออนุมัติ', approved: 'อนุมัติแล้ว', cancelled: 'ยกเลิก' };
@@ -46,7 +61,7 @@
     if (quote.status === 'ร่าง') cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
     if (quote.status === 'อนุมัติแล้ว') cell.innerHTML = `<button class="ghost" data-billing="${quote.no}">สร้างใบวางบิล</button>`;
   });
-  const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes()]); render(); renderDocumentActions(); };
+  const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); render(); renderDocumentActions(); };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
   // Always allow a fresh sign-in. This also recovers cleanly when a browser
   // restores an expired Supabase session after the page has been reopened.
