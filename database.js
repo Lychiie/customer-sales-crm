@@ -34,13 +34,13 @@
   };
   const syncCustomers = async () => {
     const rows = await request(`/rest/v1/customers?organization_id=eq.${orgId}&select=*&order=created_at.desc`);
-    state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: `${customer.credit_term_days} วัน`, sales: '฿ 0' }));
+    state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
   const syncProducts = async () => {
-    const rows = await request(`/rest/v1/products?organization_id=eq.${orgId}&select=code,name,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc`);
+    const rows = await request(`/rest/v1/products?organization_id=eq.${orgId}&select=code,name,unit,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc`);
     state.products = rows.flatMap((product) => (product.product_variants || []).filter((variant) => variant.is_active).map((variant) => {
       const price = (variant.variant_prices || []).sort((a, b) => String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price ?? 0;
-      return { id: variant.id, sku: variant.sku || product.code, name: product.name, size: variant.label, price: Number(price).toFixed(2), status: product.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' };
+      return { id: variant.id, sku: variant.sku || product.code, name: product.name, unit: product.unit || 'ชิ้น', size: variant.label, price: Number(price).toFixed(2), status: product.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' };
     }));
   };
   const syncCompanyProfile = async () => {
@@ -106,14 +106,16 @@
   // restores an expired Supabase session after the page has been reopened.
   button.onclick = login;
   const baseOpenForm = window.openForm;
+  let quotationEditor, pendingQuotation, savingQuotation = false;
+  modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
     if (type !== 'quotation') return baseOpenForm(type);
     // A browser can restore its local preview before the database requests
     // finish. Refresh first so option values always carry real database IDs.
     if (session) await syncAll();
-    const customers = state.customers.map((customer) => `<option value="${customer.id}">${customer.name}</option>`).join('');
-    const products = state.products.map((product) => `<option value="${product.id}">${product.sku} — ${product.name} (${product.size}) · ฿${product.price}</option>`).join('');
-    document.querySelector('#modal-content').innerHTML = `<div class="form-content"><h2>สร้างใบเสนอราคา</h2><label class="field"><span>ลูกค้า</span><select name="customerId" required>${customers}</select></label><label class="field"><span>สินค้า</span><select name="variantId" required>${products}</select></label><label class="field"><span>จำนวน</span><input name="quantity" required type="number" min="1" step="1" value="1"></label><label class="field"><span>วันหมดอายุ</span><input name="expires" required type="date"></label><p id="quoteSummary">ระบบคำนวณ VAT 7% ให้เมื่อบันทึก</p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="default">บันทึกร่าง</button></div></div>`;
+    if (!session || !orgId) return login();
+    pendingQuotation = null;
+    quotationEditor = window.QuotationEditor.mount(document.querySelector('#modal-content'), state.customers, state.products);
     modal.dataset.type = 'quotation'; modal.showModal();
   };
   const addProduct = async (data) => {
@@ -124,17 +126,23 @@
   };
   const addQuotation = async (data) => {
     const customer = state.customers.find((item) => item.id === data.customerId);
-    const product = state.products.find((item) => item.id === data.variantId);
-    if (!customer || !product) throw new Error('ไม่พบลูกค้าหรือสินค้า กรุณาลองใหม่');
-    const quantity = Number(data.quantity);
-    const unitPrice = Number(product.price);
-    const subtotal = quantity * unitPrice;
-    const vatAmount = subtotal * 0.07;
+    if (!customer) throw new Error('กรุณาเลือกลูกค้า');
+    const rows = quotationEditor.read();
+    const {items,...totals} = window.QuotationEditor.calculate(rows,state.products);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.expires||'')) throw new Error('กรุณาระบุวันยืนราคา');
+    const inputKey = JSON.stringify({data,rows});
+    if (pendingQuotation && pendingQuotation.inputKey !== inputKey) throw new Error('การบันทึกก่อนหน้ายังไม่สมบูรณ์ กรุณากลับเป็นข้อมูลเดิมแล้วกดบันทึกซ้ำเพื่อไม่ให้เกิดเอกสารซ้ำ');
     const today = new Date().toISOString().slice(0, 10);
-    const number = `QT-${today.replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
-    const documents = await request('/rest/v1/documents', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ organization_id: orgId, kind: 'quotation', document_number: number, status: 'draft', customer_id: customer.id, customer_name_snapshot: customer.name, customer_tax_id_snapshot: customer.taxId === '-' ? null : customer.taxId, issue_date: today, valid_until: data.expires, subtotal, taxable_amount: subtotal, vat_rate: 7, vat_amount: vatAmount, grand_total: subtotal + vatAmount, created_by: session.user.id }) });
-    await request('/rest/v1/document_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ document_id: documents[0].id, position: 1, product_variant_id: product.id, sku_snapshot: product.sku, product_name_snapshot: product.name, specification_snapshot: product.size, unit_snapshot: 'ชิ้น', quantity, unit_price: unitPrice, line_total: subtotal }) });
-    await syncAll();
+    if (!pendingQuotation) {
+      const id=crypto.randomUUID();
+      const number = `QT-${today.replaceAll('-', '')}-${id.slice(0,8).toUpperCase()}`;
+      pendingQuotation={inputKey,id,document:{id,organization_id:orgId,kind:'quotation',document_number:number,status:'draft',customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:today,valid_until:data.expires,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms.trim(),deliveryTerms:data.deliveryTerms.trim(),notes:data.notes,rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id},items};
+    }
+    // Both requests can be retried after a lost response without creating duplicate rows.
+    await window.QuotationEditor.persist(request,pendingQuotation);
+    pendingQuotation=null;
+    modal.close();
+    try { await syncAll(); } catch { alert('บันทึกใบเสนอราคาแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ'); }
   };
   const approveQuotation = async (number) => {
     await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${number}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'approved' }) });
@@ -168,7 +176,7 @@
     catch (error) { alert(error.message); }
   });
   document.querySelector('#modal-form').addEventListener('submit', async (event) => {
-    if (event.submitter.value === 'cancel' || !['login', 'customer', 'product', 'quotation'].includes(modal.dataset.type)) return;
+    if (event.submitter?.value === 'cancel' || !['login', 'customer', 'product', 'quotation'].includes(modal.dataset.type)) return;
     // The original prototype stores the row locally and closes this dialog.
     // Handle database-backed forms first, so the screen only changes after
     // Supabase has confirmed that the record was saved.
@@ -179,7 +187,13 @@
       if (modal.dataset.type === 'login') { session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(data) }); localStorage.setItem('flowbill-session', JSON.stringify(session)); await syncAll(); modal.close(); label(); }
       else if (modal.dataset.type === 'customer' && session && orgId) { await request('/rest/v1/customers', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: orgId, name: data.name, contact_name: data.contact || null, tax_id: data.taxId || null, phone: data.phone || null, credit_term_days: parseInt(data.terms) || 30 }) }); await syncCustomers(); render(); modal.close(); }
       else if (modal.dataset.type === 'product' && session && orgId) { await addProduct(data); modal.close(); }
-      else if (modal.dataset.type === 'quotation' && session && orgId) { await addQuotation(data); modal.close(); }
+      else if (modal.dataset.type === 'quotation' && session && orgId) {
+        if (savingQuotation) return;
+        savingQuotation=true;
+        const controls=[...event.currentTarget.querySelectorAll('input,textarea,select,button')];
+        controls.forEach(c=>c.disabled=true);
+        try {await addQuotation(data);} finally {savingQuotation=false;controls.forEach(c=>c.disabled=false);}
+      }
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
   }, true);
   const escapePrint = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -283,5 +297,5 @@
     finally { printButton.disabled = false; }
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
-  if (['#settings', '#tax-invoices', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if (['#quotations', '#settings', '#tax-invoices', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();

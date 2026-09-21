@@ -16,6 +16,7 @@
     }return lines;
   };
   const build=(company,doc,items,measure,logo=null)=>{
+    const details=window.QuotationEditor?.decode(doc.notes)||{paymentTerms:'',deliveryTerms:'',notes:doc.notes||'',rates:[]};
     const pages=[];let page,y,tableTop;
     const text=(s,x,y,size=19,bold=false,align='left',color=INK)=>page.push({type:'text',s:String(s??''),x,y,size,bold,align,color});
     const rect=(x,y,w,h,fill='#ffffff',stroke=LINE)=>page.push({type:'rect',x,y,w,h,fill,stroke});
@@ -38,26 +39,28 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(doc.customer_address_snapshot||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const boxY=headBottom+30,boxH=Math.max(180,65+customerLines.length*32+address.length*28+tax.length*25);
-      if(boxY+boxH>710)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่ใบเสนอราคา กรุณาตรวจข้อมูลก่อนพิมพ์');
+      const detailRows=[['ยืนราคาถึง',date(doc.valid_until)],['กำหนดส่งสินค้า',details.deliveryTerms||'-'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']].map(([label,value])=>({label,lines:wrap(value,365,18,true,measure)}));
+      const detailHeight=55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0);
+      const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
+      if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่ใบเสนอราคา กรุณาตรวจข้อมูลก่อนพิมพ์');
       rect(L,boxY,641,boxH);rect(748,boxY,409,boxH);line(748,boxY,748,boxY+boxH,INK,4);
       text('ลูกค้า / CUSTOMER',L+22,boxY+19,16,false,'left',MUTED);let ay=boxY+55;
       customerLines.forEach(s=>{text(s,L+22,ay,21,true);ay+=32;});
       address.forEach(s=>{text(s,L+22,ay,18);ay+=28;});
       tax.forEach(s=>{text(s,L+22,ay+5,16,false,'left',MUTED);ay+=25;});
       text('รายละเอียด / DETAILS',770,boxY+19,16,false,'left',MUTED);
-      text('ยืนราคาถึง',770,boxY+59,18);text(date(doc.valid_until),1135,boxY+59,18,true,'right');
-      text('สถานะ',770,boxY+99,18);text(({draft:'ร่าง',sent:'ส่งแล้ว',approved:'อนุมัติแล้ว',accepted:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก',expired:'หมดอายุ'})[doc.status]||doc.status||'-',1135,boxY+99,18,false,'right');
-      text('สกุลเงิน',770,boxY+139,18);text('บาท / THB',1135,boxY+139,18,false,'right');
+      let detailY=boxY+55;detailRows.forEach(row=>{text(row.label,770,detailY,15,false,'left',MUTED);detailY+=25;row.lines.forEach(s=>{text(s,770,detailY,18,true);detailY+=27;});detailY+=12;});
       y=boxY+boxH+38;tableTop=null;
     };
-    const widths=[50,420,114,154,146,190],xs=[L];widths.forEach(w=>xs.push(xs.at(-1)+w));
+    const widths=[50,550,100,130,90,154],xs=[L];widths.forEach(w=>xs.push(xs.at(-1)+w));
     const tableHeader=()=>{text('รายการสินค้า / ขนาด',L,y,20,true);text(items.length+' รายการ',R,y,16,false,'right',MUTED);y+=37;tableTop=y;
       widths.forEach((w,i)=>rect(xs[i],y,w,64,'#f0f3f5'));line(L,y,R,y,INK,3);
-      [['ลำดับ','NO.'],['รายการสินค้า / ขนาด','DESCRIPTION / SIZE'],['จำนวน','QTY / UNIT'],['ราคาต่อหน่วย','UNIT PRICE'],['ส่วนลด (บาท)','DISCOUNT'],['จำนวนเงิน','AMOUNT']].forEach(([th,en],i)=>{text(th,i===1?xs[i]+14:xs[i]+widths[i]/2,y+11,16,true,i===1?'left':'center');text(en,i===1?xs[i]+14:xs[i]+widths[i]/2,y+36,12,false,i===1?'left':'center',MUTED);});y+=64;};
+      [['ลำดับ','NO.'],['รายการสินค้า / ขนาด','DESCRIPTION / SIZE'],['จำนวน','QTY / UNIT'],['ราคาต่อหน่วย','UNIT PRICE'],['ลด (%)','DISCOUNT'],['จำนวนเงิน','AMOUNT']].forEach(([th,en],i)=>{text(th,i===1?xs[i]+14:xs[i]+widths[i]/2,y+11,16,true,i===1?'left':'center');text(en,i===1?xs[i]+14:xs[i]+widths[i]/2,y+36,12,false,i===1?'left':'center',MUTED);});y+=64;};
     start();tableHeader();
     items.forEach((item,index)=>{
-      const cells=[String(index+1),[item.product_name_snapshot,item.specification_snapshot].filter(v=>v!=null&&String(v).trim()).join(' '),String(item.quantity)+(item.unit_snapshot?' '+item.unit_snapshot:''),money(item.unit_price),money(item.discount_amount),money(item.line_total)];
+      const gross=Number(item.quantity)*Number(item.unit_price);
+      const rate=window.QuotationEditor?window.QuotationEditor.rateFor(item,index,details):(gross?Number(item.discount_amount||0)/gross*100:0);
+      const cells=[String(index+1),[item.product_name_snapshot,item.specification_snapshot].filter(v=>v!=null&&String(v).trim()).join(' '),String(item.quantity)+(item.unit_snapshot?' '+item.unit_snapshot:''),money(item.unit_price),Number(rate.toFixed(2))+'%',money(item.line_total)];
       const wrapped=cells.map((s,i)=>wrap(s,widths[i]-28,18,false,measure));let offset=0,total=Math.max(...wrapped.map(a=>a.length));
       while(offset<total){if(y+52>1450){start();tableHeader();}
         const capacity=Math.max(1,Math.floor((1450-y-24)/28)),count=Math.min(capacity,total-offset),h=count*28+24;
@@ -66,9 +69,9 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text('ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=920){widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}
+    if(pages.length===1){while(y+32<=1040){widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}
     y+=24;
-    const notes=wrap(doc.notes||'-',R-L-40,18,false,measure);let at=0;
+    const notes=wrap(details.notes||'-',R-L-40,18,false,measure);let at=0;
     while(at<notes.length){if(y+110>1510){start();y+=16;}const capacity=Math.max(1,Math.floor((1510-y-60)/28)),part=notes.slice(at,at+capacity),h=60+part.length*28;
       rect(L,y,R-L,h);text('หมายเหตุ / REMARKS'+(at?' (ต่อ)':''),L+20,y+15,15,true,'left',MUTED);part.forEach((s,i)=>text(s,L+20,y+48+i*28,18));y+=h+24;at+=part.length;
     }
