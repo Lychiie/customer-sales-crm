@@ -1,4 +1,9 @@
 (() => {
+  pageMeta['tax-invoices'] = ['งานขาย', 'ใบกำกับภาษี'];
+  const taxPage = document.createElement('section');
+  taxPage.id = 'tax-invoices'; taxPage.className = 'page';
+  taxPage.innerHTML = '<article class="panel settings-card"><h3>ใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูรายการใบกำกับภาษี</p></article>';
+  document.querySelector('#invoices').after(taxPage);
   const config = window.SUPABASE_CONFIG;
   let session = JSON.parse(localStorage.getItem('flowbill-session') || 'null');
   let orgId = localStorage.getItem('flowbill-org-id');
@@ -56,13 +61,35 @@
     const statusLabel = (status) => ({ draft: 'ร่าง', paid: 'ชำระแล้ว' }[status] || status);
     document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(bill.status)}</td><td>${bill.status === 'paid' ? 'ออกใบกำกับแล้ว' : `<button class="ghost" data-tax-invoice="${bill.id}">ออกใบกำกับภาษี</button>`}</td></tr>`).join('')}</tbody></table></article><article class="panel table-panel" style="margin-top:16px"><div class="panel-title"><div><h3>ใบกำกับภาษี / ใบเสร็จ</h3><p>เอกสารที่ออกหลังได้รับชำระเงิน</p></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${taxInvoices.length ? taxInvoices.map((invoice) => `<tr><td><strong>${invoice.document_number}</strong></td><td>${invoice.customer_name_snapshot}</td><td>฿ ${Number(invoice.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(invoice.status)}</td></tr>`).join('') : '<tr><td colspan="4">ยังไม่มีใบกำกับภาษี</td></tr>'}</tbody></table></article>`;
   };
+  const separateTaxInvoices = () => {
+    const taxPanel = document.querySelector('#invoices > article:last-child');
+    if (!taxPanel || !taxPanel.querySelector('h3')) return;
+    taxPage.replaceChildren(taxPanel);
+    taxPanel.style.marginTop = '0';
+    taxPanel.querySelector('h3').textContent = 'ใบกำกับภาษี';
+    taxPanel.querySelector('.panel-title p').textContent = 'ใบกำกับภาษี / ใบเสร็จรับเงินที่ออกแล้ว';
+    const actionHeading = document.createElement('th'); actionHeading.textContent = 'เอกสาร';
+    taxPanel.querySelector('thead tr').append(actionHeading);
+    taxPanel.querySelectorAll('tbody tr').forEach((row) => {
+      if (row.cells.length === 1) row.cells[0].colSpan = 5;
+      else {
+        const cell = document.createElement('td');
+        const printButton = row.querySelector('[data-print-document]');
+        if (printButton) cell.append(printButton);
+        row.append(cell);
+      }
+    });
+    const billingLink = document.createElement('button'); billingLink.className = 'ghost';
+    billingLink.textContent = 'ไปใบวางบิลเพื่อออกเอกสาร'; billingLink.onclick = () => go('invoices');
+    taxPanel.querySelector('.panel-title').append(billingLink);
+  };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row, index) => {
     const quote = state.quotations[index]; if (!quote) return;
     const cell = row.lastElementChild;
     if (quote.status === 'ร่าง') cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
     if (quote.status === 'อนุมัติแล้ว') cell.innerHTML = `<button class="ghost" data-billing="${quote.no}">สร้างใบวางบิล</button>`;
   });
-  const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); render(); renderDocumentActions(); };
+  const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); separateTaxInvoices(); render(); renderDocumentActions(); };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
   // Always allow a fresh sign-in. This also recovers cleanly when a browser
   // restores an expired Supabase session after the page has been reopened.
@@ -213,7 +240,7 @@
     preview.querySelector('[data-print-now]').focus();
   };
   const addPrintButtons = () => {
-    document.querySelectorAll('#quotation-body tr, #invoices tbody tr').forEach((row) => {
+    document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
       if (!/^(QT|BL|TI)-/.test(number || '') || row.querySelector('[data-print-document]')) return;
       const printButton = document.createElement('button');
@@ -233,5 +260,5 @@
     finally { printButton.disabled = false; }
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
-  if (location.hash === '#settings') setTimeout(() => window.go?.('settings'), 0);
+  if (['#settings', '#tax-invoices'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();
