@@ -18,6 +18,7 @@
   const config = window.SUPABASE_CONFIG;
   let session = JSON.parse(localStorage.getItem('flowbill-session') || 'null');
   let orgId = localStorage.getItem('flowbill-org-id');
+  let quotationTaxInvoices = new Map();
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
     const response = await fetch(config.url + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
@@ -63,13 +64,14 @@
     const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=id,document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
     const status = { draft: 'รออนุมัติ', sent: 'รออนุมัติ', approved: 'อนุมัติแล้ว', cancelled: 'ยกเลิก' };
     const thaiDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
-    state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, status: status[quote.status] || quote.status }));
+    state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, statusCode: quote.status, status: status[quote.status] || quote.status }));
   };
   const syncBillingNotes = async () => {
-    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,kind&order=created_at.desc`);
+    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,kind,source_document_id&order=created_at.desc`);
+    quotationTaxInvoices = window.QuotationTax.linkedInvoices(documents);
     const rows = documents.filter((document) => document.kind === 'billing_note');
     const taxInvoices = documents.filter((document) => document.kind === 'tax_invoice');
-    const statusLabel = (status) => ({ draft: 'ร่าง', paid: 'ชำระแล้ว' }[status] || status);
+    const statusLabel = (status) => ({ draft: 'ร่าง', paid: 'ชำระแล้ว', approved: 'ออกแล้ว / ยังไม่บันทึกรับชำระ', cancelled: 'ยกเลิก' }[status] || status);
     document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(bill.status)}</td><td>${bill.status === 'paid' ? 'ออกใบกำกับแล้ว' : `<button class="ghost" data-tax-invoice="${bill.id}">ออกใบกำกับภาษี</button>`}</td></tr>`).join('')}</tbody></table></article><article class="panel table-panel" style="margin-top:16px"><div class="panel-title"><div><h3>ใบกำกับภาษี / ใบเสร็จ</h3><p>เอกสารที่ออกหลังได้รับชำระเงิน</p></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${taxInvoices.length ? taxInvoices.map((invoice) => `<tr><td><strong>${invoice.document_number}</strong></td><td>${invoice.customer_name_snapshot}</td><td>฿ ${Number(invoice.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(invoice.status)}</td></tr>`).join('') : '<tr><td colspan="4">ยังไม่มีใบกำกับภาษี</td></tr>'}</tbody></table></article>`;
   };
   const separateTaxInvoices = () => {
@@ -91,7 +93,7 @@
       }
     });
     const billingLink = document.createElement('button'); billingLink.className = 'ghost';
-    billingLink.textContent = 'ไปใบวางบิลเพื่อออกเอกสาร'; billingLink.onclick = () => go('invoices');
+    billingLink.textContent = 'ไปใบเสนอราคาที่อนุมัติแล้ว'; billingLink.onclick = () => go('quotations');
     taxPanel.querySelector('.panel-title').append(billingLink);
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {
@@ -100,7 +102,16 @@
     if (['ร่าง','รออนุมัติ'].includes(quote.status)) cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
     // Billing creation is intentionally not offered in the quotation list.
   });
-  const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); separateTaxInvoices(); render(); renderDocumentActions(); await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]); };
+  const syncAll = async () => {
+    await loadOrganization();
+    await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]);
+    state.quotations.forEach(quote => {
+      quote.taxInvoiceNumber = quotationTaxInvoices.get(quote.id)?.document_number || null;
+      if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
+    });
+    separateTaxInvoices(); render(); renderDocumentActions();
+    await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]);
+  };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
   // Always allow a fresh sign-in. This also recovers cleanly when a browser
   // restores an expired Supabase session after the page has been reopened.
@@ -176,6 +187,31 @@
     catch (error) { alert(error.message); }
   });
   const deletingQuotations = new Set();
+  const issuingQuotationTax = new Set();
+  document.addEventListener('click', async event => {
+    const action = event.target.closest('[data-quotation-tax]');
+    if (!action) return;
+    if (!session || !orgId) return login();
+    const id = action.dataset.quotationTax;
+    const quote = state.quotations.find(q => q.id === id);
+    if (!window.QuotationTax.canIssue(quote) || issuingQuotationTax.has(id)) return;
+    if (!confirm(`ออกใบกำกับภาษีจาก ${quote.no} โดยคัดลอกลูกค้า รายการสินค้า และยอดเงินทั้งหมด? การออกเอกสารนี้ไม่ใช่การบันทึกรับชำระเงิน`)) return;
+    issuingQuotationTax.add(id);
+    action.disabled = true; action.textContent = 'กำลังออกใบกำกับภาษี…';
+    try {
+      const result = await window.QuotationTax.issue(request, orgId, quote);
+      quotationTaxInvoices.set(id, result);
+      try { await syncAll(); }
+      catch { alert(`ใบกำกับภาษี ${result.document_number} บันทึกแล้ว แต่โหลดรายการไม่สำเร็จ กรุณารีเฟรช ไม่ต้องออกใหม่`); return; }
+      go('tax-invoices');
+      alert(`${result.created ? 'ออกใบกำกับภาษีแล้ว' : 'เปิดใบกำกับภาษีเดิม ไม่ได้ออกซ้ำ'}: ${result.document_number}`);
+    } catch (error) { alert(error.message); }
+    finally {
+      issuingQuotationTax.delete(id);
+      action.disabled = false; action.textContent = 'ออกใบกำกับภาษี';
+      addPrintButtons();
+    }
+  });
   document.addEventListener('click', async event => {
     const action=event.target.closest('[data-delete-quotation]');
     if (!action) return;
@@ -299,6 +335,20 @@
     preview.querySelector('[data-print-now]').focus();
   };
   const addPrintButtons = () => {
+    document.querySelectorAll('#quotation-body tr').forEach(row => {
+      const quote = state.quotations.find(q => q.no === row.cells[0]?.textContent.trim());
+      const previous = row.querySelector('[data-quotation-tax-action]');
+      if (!window.QuotationTax.canIssue(quote)) { previous?.remove(); return; }
+      const linked = quotationTaxInvoices.get(quote.id);
+      const mode = linked ? `view:${linked.document_number}` : 'issue';
+      if (previous?.dataset.quotationTaxAction === mode) return;
+      previous?.remove();
+      const taxAction = document.createElement('button'); taxAction.type = 'button'; taxAction.className = 'ghost';
+      taxAction.dataset.quotationTaxAction = mode;
+      if (linked) { taxAction.dataset.printDocument = linked.document_number; taxAction.textContent = 'ดูใบกำกับภาษี'; }
+      else { taxAction.dataset.quotationTax = quote.id; taxAction.textContent = 'ออกใบกำกับภาษี'; taxAction.disabled = issuingQuotationTax.has(quote.id); }
+      row.lastElementChild.prepend(taxAction);
+    });
     document.querySelectorAll('#quotation-body tr').forEach(row=>{
       const number=row.cells[0]?.textContent.trim();
       const quote=state.quotations.find(q=>q.no===number);
@@ -310,7 +360,7 @@
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(QT|BL|TI)-/.test(number || '') || row.querySelector('[data-print-document]')) return;
+      if (!/^(QT|BL|TI)-/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';

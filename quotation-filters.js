@@ -1,11 +1,11 @@
 (() => {
-  const labels={all:'ทั้งหมด',sent:'รออนุมัติ',approved:'อนุมัติแล้ว'};
-  const statusOf=quote=>{const status=quote.statusCode||({'ร่าง':'draft','รออนุมัติ':'sent','อนุมัติแล้ว':'approved','ยกเลิก':'cancelled'}[quote.status])||quote.status;return status==='draft'?'sent':status;};
+  const labels={all:'ทั้งหมด',sent:'รออนุมัติ',approved:'อนุมัติแล้ว',awaiting_tax:'รอออกใบกำกับภาษี',tax_issued:'ออกใบกำกับภาษีแล้ว'};
+  const statusOf=quote=>{const status=quote.statusCode||({'ร่าง':'draft','รออนุมัติ':'sent','อนุมัติแล้ว':'approved','รอออกใบกำกับภาษี':'approved','ออกใบกำกับภาษีแล้ว':'approved','ยกเลิก':'cancelled'}[quote.status])||quote.status;return status==='draft'?'sent':status;};
+  const matches=(quote,key)=>key==='all'||(key==='awaiting_tax'?statusOf(quote)==='approved'&&!quote.taxInvoiceNumber:key==='tax_issued'?statusOf(quote)==='approved'&&Boolean(quote.taxInvoiceNumber):statusOf(quote)===key);
   const select=(quotes,status='all',query='')=>{
     const term=String(query).trim().toLocaleLowerCase('th-TH');
-    const counts={all:quotes.length,sent:0,approved:0};
-    quotes.forEach(q=>{const key=statusOf(q);if(key!=='all'&&Object.hasOwn(counts,key))counts[key]++;});
-    const rows=quotes.filter(q=>(status==='all'||statusOf(q)===status)&&(!term||[q.no,q.customer].some(value=>String(value??'').toLocaleLowerCase('th-TH').includes(term))));
+    const counts=Object.fromEntries(Object.keys(labels).map(key=>[key,quotes.filter(q=>matches(q,key)).length]));
+    const rows=quotes.filter(q=>matches(q,status)&&(!term||[q.no,q.customer].some(value=>String(value??'').toLocaleLowerCase('th-TH').includes(term))));
     return {counts,rows};
   };
   const mount=(root,getQuotes)=>{
@@ -15,6 +15,7 @@
     tabs.forEach(tab=>tab.remove());
     tabs.length=0;
     const toolbar=root.querySelector('.tabs');
+    toolbar.style.flexWrap='wrap';
     Object.keys(labels).forEach(key=>{const tab=document.createElement('button');tab.className='tab';tab.dataset.quotationFilter=key;tab.type='button';toolbar.append(tab);tabs.push(tab);});
     search.setAttribute('aria-label','ค้นหาใบเสนอราคาด้วยเลขที่เอกสารหรือชื่อลูกค้า');
     search.placeholder='ค้นหาเลขที่เอกสาร / ลูกค้า';
