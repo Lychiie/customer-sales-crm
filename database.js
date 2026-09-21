@@ -5,8 +5,9 @@
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
     const response = await fetch(config.url + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
-    if (!response.ok) { const detail = await response.json().catch(() => ({})); throw new Error(detail.message || detail.hint || 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ'); }
-    return response.status === 204 ? null : response.json();
+    const body = await response.text();
+    if (!response.ok) { const detail = JSON.parse(body || '{}'); throw new Error(detail.message || detail.hint || 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ'); }
+    return body ? JSON.parse(body) : null;
   };
   const button = document.createElement('button'); button.className = 'ghost'; document.querySelector('.header-actions').prepend(button);
   const label = () => { button.textContent = session ? '● ฐานข้อมูลเชื่อมแล้ว' : 'เข้าสู่ระบบ'; }; label();
