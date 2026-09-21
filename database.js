@@ -34,9 +34,11 @@
     state.quotations = rows.map((quote) => ({ no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, status: status[quote.status] || quote.status }));
   };
   const syncBillingNotes = async () => {
-    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=document_number,customer_name_snapshot,grand_total,status,kind&order=created_at.desc`);
+    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,kind&order=created_at.desc`);
     const rows = documents.filter((document) => document.kind === 'billing_note');
-    document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${bill.status === 'draft' ? 'ร่าง' : bill.status}</td></tr>`).join('')}</tbody></table></article>`;
+    const taxInvoices = documents.filter((document) => document.kind === 'tax_invoice');
+    const statusLabel = (status) => ({ draft: 'ร่าง', paid: 'ชำระแล้ว' }[status] || status);
+    document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th><th></th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(bill.status)}</td><td>${bill.status === 'paid' ? 'ออกใบกำกับแล้ว' : `<button class="ghost" data-tax-invoice="${bill.id}">ออกใบกำกับภาษี</button>`}</td></tr>`).join('')}</tbody></table></article><article class="panel table-panel" style="margin-top:16px"><div class="panel-title"><div><h3>ใบกำกับภาษี / ใบเสร็จ</h3><p>เอกสารที่ออกหลังได้รับชำระเงิน</p></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะ</th></tr></thead><tbody>${taxInvoices.length ? taxInvoices.map((invoice) => `<tr><td><strong>${invoice.document_number}</strong></td><td>${invoice.customer_name_snapshot}</td><td>฿ ${Number(invoice.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${statusLabel(invoice.status)}</td></tr>`).join('') : '<tr><td colspan="4">ยังไม่มีใบกำกับภาษี</td></tr>'}</tbody></table></article>`;
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row, index) => {
     const quote = state.quotations[index]; if (!quote) return;
@@ -93,9 +95,22 @@
     if (items.length) await request('/rest/v1/document_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ ...item, document_id: bills[0].id }))) });
     await syncAll();
   };
+  const createTaxInvoice = async (billingId) => {
+    const source = (await request(`/rest/v1/documents?id=eq.${billingId}&organization_id=eq.${orgId}&select=*&limit=1`))[0];
+    if (!source) throw new Error('ไม่พบใบวางบิล');
+    const existing = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.tax_invoice&source_document_id=eq.${billingId}&select=id&limit=1`);
+    if (existing.length) throw new Error('ใบวางบิลนี้ออกใบกำกับภาษีแล้ว');
+    const number = `TI-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
+    const invoices = await request('/rest/v1/documents', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ organization_id: orgId, kind: 'tax_invoice', document_number: number, status: 'paid', customer_id: source.customer_id, customer_name_snapshot: source.customer_name_snapshot, customer_tax_id_snapshot: source.customer_tax_id_snapshot, customer_address_snapshot: source.customer_address_snapshot, issue_date: new Date().toISOString().slice(0, 10), subtotal: source.subtotal, discount_amount: source.discount_amount, taxable_amount: source.taxable_amount, vat_rate: source.vat_rate, vat_amount: source.vat_amount, grand_total: source.grand_total, source_document_id: source.id, created_by: session.user.id }) });
+    const items = await request(`/rest/v1/document_items?document_id=eq.${source.id}&select=position,product_variant_id,sku_snapshot,product_name_snapshot,specification_snapshot,unit_snapshot,quantity,unit_price,discount_amount,line_total`);
+    if (items.length) await request('/rest/v1/document_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ ...item, document_id: invoices[0].id }))) });
+    await request(`/rest/v1/documents?id=eq.${billingId}&organization_id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'paid' }) });
+    await syncAll();
+    alert(`ออกใบกำกับภาษี ${number} เรียบร้อย`);
+  };
   document.addEventListener('click', async (event) => {
-    const action = event.target.closest('[data-approve],[data-billing]'); if (!action || !session || !orgId) return;
-    try { if (action.dataset.approve) await approveQuotation(action.dataset.approve); if (action.dataset.billing) await createBillingNote(action.dataset.billing); }
+    const action = event.target.closest('[data-approve],[data-billing],[data-tax-invoice]'); if (!action || !session || !orgId) return;
+    try { if (action.dataset.approve) await approveQuotation(action.dataset.approve); if (action.dataset.billing) await createBillingNote(action.dataset.billing); if (action.dataset.taxInvoice) await createTaxInvoice(action.dataset.taxInvoice); }
     catch (error) { alert(error.message); }
   });
   document.querySelector('#modal-form').addEventListener('submit', async (event) => {
