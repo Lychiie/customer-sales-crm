@@ -94,10 +94,10 @@
     billingLink.textContent = 'ไปใบวางบิลเพื่อออกเอกสาร'; billingLink.onclick = () => go('invoices');
     taxPanel.querySelector('.panel-title').append(billingLink);
   };
-  const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row, index) => {
-    const quote = state.quotations[index]; if (!quote) return;
+  const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {
+    const quote = state.quotations.find(q=>q.no===row.cells[0]?.textContent.trim()); if (!quote) return;
     const cell = row.lastElementChild;
-    if (quote.status === 'ร่าง') cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
+    if (['ร่าง','รออนุมัติ'].includes(quote.status)) cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
     // Billing creation is intentionally not offered in the quotation list.
   });
   const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); separateTaxInvoices(); render(); renderDocumentActions(); await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]); };
