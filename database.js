@@ -143,9 +143,11 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.expires||'')) throw new Error('กรุณาระบุวันยืนราคา');
     const inputKey = JSON.stringify({data,rows});
     if (pendingQuotation && pendingQuotation.inputKey !== inputKey) throw new Error('การบันทึกก่อนหน้ายังไม่สมบูรณ์ กรุณากลับเป็นข้อมูลเดิมแล้วกดบันทึกซ้ำเพื่อไม่ให้เกิดเอกสารซ้ำ');
-    const today = new Date().toISOString().slice(0, 10);
+    const today = window.QuotationEditor.issueDate();
     if (!pendingQuotation) {
       const id=crypto.randomUUID();
+      // Compatibility placeholder only: the database assigns the annual number on insert.
+      // Keeping the UUID stable lets retries reuse the original document and number.
       const number = `QT-${today.replaceAll('-', '')}-${id.slice(0,8).toUpperCase()}`;
       pendingQuotation={inputKey,id,document:{id,organization_id:orgId,kind:'quotation',document_number:number,status:'draft',customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:today,valid_until:data.expires,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms.trim(),deliveryTerms:data.deliveryTerms.trim(),notes:data.notes,rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id},items};
     }
@@ -360,7 +362,7 @@
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(QT|BL|TI)-/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
+      if (!/^(?:(?:QT|BL|TI)-|QT\d{2}-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';

@@ -5,6 +5,8 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const round = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const money = n => Number(n).toLocaleString('th-TH', {minimumFractionDigits:2,maximumFractionDigits:2});
+  const issueDate = (now = new Date()) => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+  const numberExample = date => `QT${String(Number(date.slice(0,4))+543).slice(-2)}-0001`;
   const encode = ({paymentTerms='',deliveryTerms='',notes='',rates=[]}) => prefix + JSON.stringify({paymentTerms,deliveryTerms,notes,rates});
   const decode = value => {
     const raw = String(value ?? '');
@@ -43,6 +45,9 @@
   const mount = (root, customers, products) => {
     root.innerHTML=`<style>#modal[data-type="quotation"]{width:min(1160px,96vw);max-width:96vw}#modal[data-type="quotation"] .form-content{padding:30px}.qe-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.qe-items{display:grid;gap:14px}.qe-row{border:1px solid #dbe1e8;padding:16px;border-radius:10px;background:#f8fafc}.qe-top{display:flex;justify-content:space-between;align-items:center}.qe-row .field{margin:8px 0}.qe-numbers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.qe-row select,.qe-row textarea,.qe-grid input,.qe-grid select{width:100%;padding:10px;border:1px solid #ccd4dd;border-radius:6px;font:inherit}.qe-row textarea{resize:vertical;min-height:65px}.qe-bottom{display:flex;justify-content:space-between;gap:12px;align-items:center;position:sticky;bottom:0;background:white;padding:14px 0}.qe-total{white-space:pre-line;line-height:1.8}@media(max-width:650px){.qe-grid,.qe-numbers{grid-template-columns:1fr}.qe-bottom{position:static;flex-wrap:wrap}}</style>
       <div class="form-content"><h2>สร้างใบเสนอราคา</h2><div class="qe-grid"><label class="field"><span>ลูกค้า</span><select name="customerId" required>${customers.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')}</select></label><label class="field"><span>ยืนราคาถึง</span><input name="expires" required type="date"></label><label class="field"><span>เงื่อนไขชำระเงิน / เครดิต</span><input name="paymentTerms" maxlength="120" placeholder="เช่น เครดิต 30 วัน หรือ มัดจำ 50%"></label><label class="field"><span>กำหนดส่งสินค้า</span><input name="deliveryTerms" maxlength="120" placeholder="เช่น ภายใน 15 วันหลังยืนยันคำสั่งซื้อ"></label></div><h3>รายการสินค้า</h3><p>เพิ่มได้หลายรายการ ข้อความต่อเนื่องจนเต็มบรรทัด หรือกด Enter เพื่อขึ้นบรรทัดใหม่</p><div class="qe-items"></div><div class="qe-bottom"><button type="button" class="ghost" data-qe-add>+ เพิ่มรายการสินค้า</button><strong data-qe-count></strong></div><label class="field"><span>หมายเหตุ</span><textarea name="notes" rows="2"></textarea></label><p class="qe-total" aria-live="polite"></p><div class="form-actions"><button value="cancel" formnovalidate class="ghost">ยกเลิก</button><button class="primary" value="default">บันทึกร่าง</button></div></div>`;
+    const numberingNotice=document.createElement('p');
+    numberingNotice.textContent=`เลขที่อัตโนมัติรูปแบบ ${numberExample(issueDate())} • เรียงตามปี พ.ศ. • ระบบกำหนดเลขจริงเมื่อบันทึก`;
+    root.querySelector('h2').after(numberingNotice);
     const container=root.querySelector('.qe-items');
     const read=()=>[...container.children].map(row=>({variantId:row.querySelector('[data-variant]').value,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unitPrice:row.querySelector('[data-price]').value,discountRate:row.querySelector('[data-discount]').value}));
     const update=()=>{
@@ -63,5 +68,5 @@
     customerSelect.onchange();add();
     return {read};
   };
-  window.QuotationEditor={encode,decode,calculate,rateFor,persist,mount};
+  window.QuotationEditor={encode,decode,calculate,rateFor,persist,mount,issueDate,numberExample};
 })();
