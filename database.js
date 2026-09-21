@@ -144,4 +144,5 @@
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
   }, true);
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
+  if (location.hash === '#settings') setTimeout(() => window.go?.('settings'), 0);
 })();
