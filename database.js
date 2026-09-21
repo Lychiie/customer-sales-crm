@@ -224,6 +224,12 @@
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
     <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
     document.body.append(preview);
+    if (doc.kind === 'tax_invoice' && window.ContinuousForm) {
+      const formButton = document.createElement('button'); formButton.type = 'button';
+      formButton.textContent = 'พิมพ์ลงฟอร์มต่อเนื่อง (Letter)';
+      formButton.onclick = async () => { try { await window.ContinuousForm.open(company, doc, items, orgId); } catch (error) { alert(error.message); } };
+      preview.querySelector('.print-tools').append(formButton);
+    }
     const downloadLink = document.createElement('a');
     downloadLink.textContent = 'กำลังเตรียม PDF…';
     downloadLink.style.cssText = 'display:inline-block;padding:10px 16px;background:#24344e;color:white;border-radius:6px;text-decoration:none';
