@@ -340,7 +340,17 @@
     preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
     preview.querySelector('[data-print-now]').focus();
   };
+  const openingDelivery = new Set();
   const addPrintButtons = () => {
+    document.querySelectorAll('#quotation-body tr').forEach(row=>{
+      const quote=state.quotations.find(q=>q.no===row.cells[0]?.textContent.trim());
+      const existing=row.querySelector('[data-quotation-delivery]');
+      if(!window.QuotationDelivery.canIssue(quote)){existing?.remove();return;}
+      if(existing)return;
+      const action=document.createElement('button');action.type='button';action.className='ghost';
+      action.dataset.quotationDelivery=quote.id;action.textContent='ออกใบส่งสินค้า';action.disabled=openingDelivery.has(quote.id);
+      row.lastElementChild.prepend(action);
+    });
     document.querySelectorAll('#quotation-body tr').forEach(row => {
       const quote = state.quotations.find(q => q.no === row.cells[0]?.textContent.trim());
       const previous = row.querySelector('[data-quotation-tax-action]');
@@ -382,6 +392,15 @@
     try { await previewDocument(printButton.dataset.printDocument); }
     catch (error) { alert(error.message); }
     finally { printButton.disabled = false; }
+  });
+  document.addEventListener('click',async event=>{
+    const action=event.target.closest('[data-quotation-delivery]');if(!action)return;
+    if(!session||!orgId)return login();
+    const id=action.dataset.quotationDelivery;if(openingDelivery.has(id))return;
+    const quote=state.quotations.find(q=>q.id===id);openingDelivery.add(id);action.disabled=true;
+    try{await window.QuotationDelivery.open(request,orgId,quote,async result=>{
+      window.go?.('delivery-notes');await window.DeliveryNotes.openSaved(request,orgId,result.id);
+    });}catch(error){alert(error.message);}finally{openingDelivery.delete(id);action.disabled=false;}
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
   if (['#quotations', '#settings', '#tax-invoices', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);

@@ -88,5 +88,6 @@
       page.querySelector('[data-new]').onclick=run(openForm);page.querySelectorAll('[data-view]').forEach(b=>b.onclick=run(()=>showSaved(b.dataset.view)));
     }catch(e){page.innerHTML=`<article class="panel settings-card"><h3>ใบส่งสินค้า</h3><p class="dn-error">ยังโหลดใบส่งสินค้าไม่ได้: ${escape(e.message)}</p><button class="ghost" data-retry>ลองใหม่</button></article>`;page.querySelector('[data-retry]').onclick=()=>load(api,organizationId);}
   };
-  window.DeliveryNotes={load,buildSheet};
+  const openSaved=async(request,orgId,id)=>{await load(request,orgId);await showSaved(id);};
+  window.DeliveryNotes={load,buildSheet,openSaved};
 })();
