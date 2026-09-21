@@ -68,7 +68,7 @@
     items.forEach((item,index)=>{
       const gross=Number(item.quantity)*Number(item.unit_price);
       const rate=window.QuotationEditor?window.QuotationEditor.rateFor(item,index,details):(gross?Number(item.discount_amount||0)/gross*100:0);
-      const cells=billing?[String(index+1),'ใบกำกับภาษี เลขที่ '+item.document_number,date(item.issue_date),date(item.due_date),money(item.grand_total)]:[String(index+1),[item.product_name_snapshot,item.specification_snapshot].filter(v=>v!=null&&String(v).trim()).join(' '),String(item.quantity)+(item.unit_snapshot?' '+item.unit_snapshot:''),money(item.unit_price),Number(rate.toFixed(2))+'%',money(item.line_total)];
+      const cells=billing?[String(index+1),'ใบกำกับภาษี เลขที่ '+item.document_number,date(item.issue_date),date(item.due_date||item.issue_date),money(item.grand_total)]:[String(index+1),[item.product_name_snapshot,item.specification_snapshot].filter(v=>v!=null&&String(v).trim()).join(' '),String(item.quantity)+(item.unit_snapshot?' '+item.unit_snapshot:''),money(item.unit_price),Number(rate.toFixed(2))+'%',money(item.line_total)];
       const wrapped=cells.map((s,i)=>wrap(s,widths[i]-28,18,false,measure));let offset=0,total=Math.max(...wrapped.map(a=>a.length));
       while(offset<total){if(y+52>1450){start();tableHeader();}
         const capacity=Math.max(1,Math.floor((1450-y-24)/28)),count=Math.min(capacity,total-offset),h=count*28+24;
