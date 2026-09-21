@@ -42,13 +42,14 @@
     const original=String(value??'').trim();if(!original)return [];
     const explicit=original.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     const fits=lines=>lines.every(s=>measure(s)<=width);
-    if(explicit.length===2&&fits(explicit))return explicit;
     const text=original.replace(/\s+/g,' ');
     const split=i=>[text.slice(0,i).trim(),text.slice(i).trim()];
-    // Prefer a meaningful second line starting with subdistrict/locality.
-    for(const match of text.matchAll(/(?:ตำบล|แขวง|ต\.|อำเภอ|เขต|อ\.)/g)){
-      const lines=split(match.index);if(lines.every(Boolean)&&fits(lines))return lines;
+    // Keep subdistrict on line 1; district starts line 2, even for older snapshots
+    // containing a newline before subdistrict. The renderer fits font size, not content.
+    for(const match of text.matchAll(/(?:อำเภอ|(?:^|\s)เขต|(?:^|\s)อ\.)/g)){
+      const lines=split(match.index);if(lines.every(Boolean))return lines;
     }
+    if(explicit.length===2&&fits(explicit))return explicit;
     const breaks=new Set([...text.matchAll(/\s+/g)].map(m=>m.index));
     if(typeof Intl.Segmenter==='function')for(const part of new Intl.Segmenter('th',{granularity:'word'}).segment(text))breaks.add(part.index);
     const choices=[...breaks].map(split).filter(lines=>lines.every(Boolean));
