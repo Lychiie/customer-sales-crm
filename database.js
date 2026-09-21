@@ -20,7 +20,7 @@
     state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: `${customer.credit_term_days} วัน`, sales: '฿ 0' }));
   };
   const syncProducts = async () => {
-    const rows = await request(`/rest/v1/products?organization_id=eq.${orgId}&select=code,name,is_active,product_variants(sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc`);
+    const rows = await request(`/rest/v1/products?organization_id=eq.${orgId}&select=code,name,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc`);
     state.products = rows.flatMap((product) => (product.product_variants || []).filter((variant) => variant.is_active).map((variant) => {
       const price = (variant.variant_prices || []).sort((a, b) => String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price ?? 0;
       return { id: variant.id, sku: variant.sku || product.code, name: product.name, size: variant.label, price: Number(price).toFixed(2), status: product.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' };
