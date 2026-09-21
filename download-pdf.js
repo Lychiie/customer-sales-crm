@@ -43,8 +43,7 @@ window.buildSalesPDF = async (company, doc, items) => {
   y += 14; rule();
   items.forEach((item, index) => {
     if (y > height - 320) newPage();
-    text(`${index + 1}. ${item.product_name_snapshot || ''}`, 25, true);
-    text(`รหัส ${item.sku_snapshot || '-'}   ขนาด ${item.specification_snapshot || '-'}`);
+    text(`${index + 1}. ${[item.product_name_snapshot,item.specification_snapshot,item.sku_snapshot].filter(value => value != null && String(value).trim()).join(' ')}`, 25, true);
     text(`${item.quantity} ${item.unit_snapshot || ''} × ${money(item.unit_price)} บาท   ส่วนลด ${money(item.discount_amount)} บาท`);
     text(`รวม ${money(item.line_total)} บาท`, 24, true); rule();
   });
