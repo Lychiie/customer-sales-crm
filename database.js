@@ -38,8 +38,11 @@
   // restores an expired Supabase session after the page has been reopened.
   button.onclick = login;
   const baseOpenForm = window.openForm;
-  window.openForm = (type) => {
+  window.openForm = async (type) => {
     if (type !== 'quotation') return baseOpenForm(type);
+    // A browser can restore its local preview before the database requests
+    // finish. Refresh first so option values always carry real database IDs.
+    if (session) await syncAll();
     const customers = state.customers.map((customer) => `<option value="${customer.id}">${customer.name}</option>`).join('');
     const products = state.products.map((product) => `<option value="${product.id}">${product.sku} — ${product.name} (${product.size}) · ฿${product.price}</option>`).join('');
     document.querySelector('#modal-content').innerHTML = `<div class="form-content"><h2>สร้างใบเสนอราคา</h2><label class="field"><span>ลูกค้า</span><select name="customerId" required>${customers}</select></label><label class="field"><span>สินค้า</span><select name="variantId" required>${products}</select></label><label class="field"><span>จำนวน</span><input name="quantity" required type="number" min="1" step="1" value="1"></label><label class="field"><span>วันหมดอายุ</span><input name="expires" required type="date"></label><p id="quoteSummary">ระบบคำนวณ VAT 7% ให้เมื่อบันทึก</p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="default">บันทึกร่าง</button></div></div>`;
