@@ -282,7 +282,7 @@
       #document-preview button{padding:10px 16px;border:1px solid #ccd3df;border-radius:6px;cursor:pointer}
       #document-preview .paper{box-sizing:border-box;background:white;width:210mm;max-width:100%;min-height:270mm;margin:24px auto;padding:16mm}
       #document-preview h1{font-size:23px;margin:0 0 12px}#document-preview h2{font-size:20px;margin:0 0 10px}
-      #document-preview .print-head{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #24344e;padding-bottom:20px;margin-bottom:20px}
+      #document-preview .print-brand{display:flex;gap:12px;align-items:center;margin-bottom:12px}#document-preview .print-brand h2{margin:0}#document-preview .print-company-logo{width:68px;height:68px;object-fit:contain;flex:none;print-color-adjust:exact}#document-preview .print-head>div{min-width:0}#document-preview .print-head{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:24px;border-bottom:2px solid #24344e;padding-bottom:20px;margin-bottom:20px}
       #document-preview td.item-description{white-space:pre-wrap;overflow-wrap:anywhere}
       #document-preview .address{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
       #document-preview table{width:100%;border-collapse:collapse;margin-top:22px;font-size:13px;table-layout:fixed}
@@ -293,7 +293,7 @@
       @page{size:A4;margin:12mm}
       @media print{body>*:not(#document-preview){display:none!important}#document-preview{position:static;background:white;overflow:visible}#document-preview .print-tools{display:none}#document-preview .paper{width:auto;max-width:none;min-height:0;margin:0;padding:0}#document-preview tr,#document-preview .totals,#document-preview .signatures{break-inside:avoid}#document-preview thead{display:table-header-group}}
     </style><div class="print-tools"><button type="button" data-print-now>พิมพ์ / บันทึก PDF</button><button type="button" data-print-close>กลับไปยังรายการ</button><span>เลือก Save as PDF หรือ บันทึกเป็น PDF ในหน้าพิมพ์</span></div>
-    <article class="paper"><header class="print-head"><div><h2>${e(company.name)}</h2><div class="address">${e(window.DocumentAddress.format(company.address) || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p></div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
+    <article class="paper"><header class="print-head"><div><div class="print-brand"><img class="print-company-logo" src="company-logo.png" alt="โลโก้บริษัท"><h2>${e(company.name)}</h2></div><div class="address">${e(window.DocumentAddress.format(company.address) || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p></div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
     <div class="address"><strong>ลูกค้า: ${e(doc.customer_name_snapshot)}</strong><br>${e(window.DocumentAddress.format(doc.customer_address_snapshot) || '-')}<br>เลขประจำตัวผู้เสียภาษี ${e(doc.customer_tax_id_snapshot || '-')}</div>
     ${doc.valid_until ? `<p>ยืนราคาถึง ${e(date(doc.valid_until))}</p>` : ''}${doc.due_date ? `<p>กำหนดชำระ ${e(date(doc.due_date))}</p>` : ''}
     <table><thead><tr><th style="width:7%">ลำดับ</th><th style="width:39%">สินค้า / ขนาด</th><th style="width:14%">จำนวน</th><th class="number" style="width:20%">ราคาต่อหน่วย</th><th class="number" style="width:20%">รวม</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td><td class="item-description">${e([item.product_name_snapshot,item.specification_snapshot,item.sku_snapshot].filter(value => value != null && String(value).trim()).join(' '))}</td><td>${e(item.quantity)} ${e(item.unit_snapshot)}</td><td class="number">${money(item.unit_price)}</td><td class="number">${money(item.line_total)}</td></tr>`).join('')}</tbody></table>
@@ -305,6 +305,7 @@
       preview.querySelector('.paper').remove();
       preview.insertAdjacentHTML('beforeend', documentLayout.styles + documentLayout.toSVG(layout));
     }
+    if(!documentLayout){try{await preview.querySelector('.print-company-logo').decode();}catch{throw new Error('โหลดโลโก้บริษัทไม่ได้ กรุณาเปิดเอกสารใหม่');}}
     document.body.append(preview);
     if (doc.kind === 'tax_invoice' && window.ContinuousForm) {
       const formButton = document.createElement('button'); formButton.type = 'button';

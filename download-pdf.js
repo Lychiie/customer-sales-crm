@@ -2,7 +2,7 @@
 window.buildSalesPDF = async (company, doc, items) => {
   await document.fonts.ready;
   const pages = [];
-  let canvas, ctx, y;
+  let canvas, ctx, y, companyLogo;
   const width = 1240, height = 1754, margin = 90;
   const money = value => Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const titles = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน' };
@@ -10,6 +10,7 @@ window.buildSalesPDF = async (company, doc, items) => {
     canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = '#172033'; ctx.textBaseline = 'top'; y = margin; pages.push(canvas);
+    if(companyLogo){const ratio=companyLogo.naturalWidth/companyLogo.naturalHeight;const h=Math.min(120,120/ratio),w=h*ratio;ctx.drawImage(companyLogo,margin+(120-w)/2,margin,w,h);y=margin+145;}
   };
   const text = (value, size = 24, bold = false, x = margin, maxWidth = width - margin * 2) => {
     ctx.font = `${bold ? 'bold ' : ''}${size}px Tahoma, Arial, sans-serif`;
@@ -33,9 +34,14 @@ window.buildSalesPDF = async (company, doc, items) => {
     const layout=await documentLayout.prepare(company,doc,items);
     pages.push(...documentLayout.draw(layout,()=>document.createElement('canvas')));
   } else {
-  newPage();
-  text(company.name || '-', 32, true);
-  text(window.DocumentAddress.format(company.address) || '-'); text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`);
+  companyLogo=new Image();companyLogo.src=new URL('company-logo.png',document.baseURI).href;
+  try{await companyLogo.decode();}catch{throw new Error('โหลดโลโก้บริษัทไม่ได้ กรุณาเปิดเอกสารใหม่');}
+  newPage();y=margin;
+  const issuerX=margin+150,issuerWidth=width-margin-issuerX;
+  text(company.name || '-',32,true,issuerX,issuerWidth);
+  text(window.DocumentAddress.format(company.address) || '-',24,false,issuerX,issuerWidth);
+  text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`,24,false,issuerX,issuerWidth);
+  y=Math.max(y,margin+145);
   y += 16; rule(); text(titles[doc.kind] || 'เอกสาร', 32, true);
   text(`เลขที่ ${doc.document_number}`);
   text(`วันที่ ${doc.issue_date ? new Date(doc.issue_date + 'T00:00:00').toLocaleDateString('th-TH') : '-'}`);
