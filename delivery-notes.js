@@ -13,7 +13,7 @@
     #dn-preview {position:fixed;inset:0;background:#e9edf2;z-index:10000;overflow:auto;padding:22px}
     .dn-actions {max-width:190mm;margin:0 auto 16px;display:flex;gap:12px;align-items:center}
     .dn-sheet {background:white;color:#111;width:190mm;min-height:267mm;margin:auto;padding:10mm;box-sizing:content-box;font:13px Tahoma,Arial,sans-serif}
-    .dn-head {display:flex;justify-content:space-between;gap:25px;margin-bottom:20px}.dn-head h2 {font-size:20px;margin:0 0 10px}.dn-head p {margin:5px 0}
+    .dn-head {display:flex;justify-content:space-between;gap:25px;margin-bottom:20px}.dn-head>div:first-child{max-width:60%}.dn-head h2 {font-size:20px;margin:0 0 10px}.dn-head p {margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
     .dn-box {border:1px solid #111;padding:10px;white-space:pre-wrap;overflow-wrap:anywhere}
     .dn-sheet table {width:100%;border-collapse:collapse;margin:14px 0 0;table-layout:fixed}
     .dn-sheet th,.dn-sheet td {border:1px solid #111;padding:9px;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;color:#111;background:white}
