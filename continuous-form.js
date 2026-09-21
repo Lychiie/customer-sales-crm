@@ -37,6 +37,24 @@
     }
     return lines;
   };
+  // Format only the printed snapshot; never change the saved address.
+  const addressLines=(value,width,measure)=>{
+    const original=String(value??'').trim();if(!original)return [];
+    const explicit=original.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const fits=lines=>lines.every(s=>measure(s)<=width);
+    if(explicit.length===2&&fits(explicit))return explicit;
+    const text=original.replace(/\s+/g,' ');
+    const split=i=>[text.slice(0,i).trim(),text.slice(i).trim()];
+    // Prefer a meaningful second line starting with subdistrict/locality.
+    for(const match of text.matchAll(/(?:ตำบล|แขวง|ต\.|อำเภอ|เขต|อ\.)/g)){
+      const lines=split(match.index);if(lines.every(Boolean)&&fits(lines))return lines;
+    }
+    const breaks=new Set([...text.matchAll(/\s+/g)].map(m=>m.index));
+    if(typeof Intl.Segmenter==='function')for(const part of new Intl.Segmenter('th',{granularity:'word'}).segment(text))breaks.add(part.index);
+    const choices=[...breaks].map(split).filter(lines=>lines.every(Boolean));
+    choices.sort((a,b)=>Math.max(...a.map(measure))-Math.max(...b.map(measure)));
+    return choices.find(fits)||choices[0]||[text];
+  };
   const paginate=(items,cfg,measure)=>{
     validate(cfg);
     const capacity=Math.floor((cfg.end-cfg.start)/cfg.line),pages=[[]];let used=0;
@@ -107,7 +125,16 @@
           // SVG baselines avoid CSS line-box/font ascent differences shifting the PDF coordinates.
           return `<svg class="cf-field" xmlns="http://www.w3.org/2000/svg" aria-label="${escape(text)}" style="left:${mm(x+cfg.x)};top:${mm(y-em+cfg.y)};width:${mm(w)};height:${mm(h+em)};overflow:visible" viewBox="0 0 ${w} ${h+em}"><text font-family="${escape(family)}" font-size="${em}" font-weight="${bold?'700':'400'}" text-anchor="${anchor}" xml:space="preserve">${lines.map((line,i)=>`<tspan x="${tx}" y="${em+i*spacing}">${escape(line)}</tspan>`).join('')}</text></svg>`;
         };
-        const field=(key,text,align='left')=>{const [,x,y,w,h]=fields[key],p=cfg.fieldPositions[key]||{x,y};const heading=key.startsWith('company');return make(text,p.x,p.y,w,h,align,heading?(key==='company'?24:12):cfg.font,heading?'Browallia New, Tahoma, sans-serif':FONT,heading,key==='address'?6.33:4.5);};
+        const field=(key,text,align='left')=>{
+          const [,x,y,w,h]=fields[key],p=cfg.fieldPositions[key]||{x,y};
+          if(key==='address'){
+            let font=cfg.font,lines=[];
+            for(;font>=10;font-=.5){context.font=`${font*96/72}px ${FONT}`;lines=addressLines(text,w*96/25.4,s=>context.measureText(s).width);if(lines.every(s=>context.measureText(s).width<=w*96/25.4))break;}
+            if(font<10){font=10;warnings.push('ที่อยู่ยาวเกิน 2 บรรทัด กรุณาย่อที่อยู่ก่อนพิมพ์');}
+            return make(lines.join('\n'),p.x,p.y,w,h,align,font,FONT,false,6.33);
+          }
+          const heading=key.startsWith('company');return make(text,p.x,p.y,w,h,align,heading?(key==='company'?24:12):cfg.font,heading?'Browallia New, Tahoma, sans-serif':FONT,heading);
+        };
         const header={company:company.name||'',companyAddress:company.address||'',companyTax:company.tax_id?'เลขประจำตัวผู้เสียภาษี '+company.tax_id:'',customer:doc.customer_name_snapshot||'',branch:doc.customer_branch_snapshot||'',tax:doc.customer_tax_id_snapshot||'',address:doc.customer_address_snapshot||'',number:doc.document_number,date:date(doc.issue_date),due:date(doc.due_date),terms:doc.credit_term_snapshot||'',reference:doc.reference||'',employee:doc.employee_name_snapshot||'',po:doc.po_number||''};
         overlay.querySelector('.cf-pages').innerHTML=pages.map((rows,pageIndex)=>{
           const last=pageIndex===pages.length-1;
@@ -136,5 +163,5 @@
     const print=test=>{if(!render())return;overlay.classList.toggle('cf-test',test);window.print();};
     overlay.querySelector('[data-test]').onclick=()=>print(true);overlay.querySelector('[data-print]').onclick=()=>print(false);render();
   };
-  window.ContinuousForm={open,wrap,paginate,defaults,validate,bahtText};
+  window.ContinuousForm={open,wrap,addressLines,paginate,defaults,validate,bahtText};
 })();
