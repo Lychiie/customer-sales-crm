@@ -24,18 +24,21 @@
     const block=(s,x,y,width,size=19,bold=false,color=INK)=>{const lines=wrap(s,width,size,bold,measure);lines.forEach((s,i)=>text(s,x,y+i*size*1.55,size,bold,'left',color));return lines.length*size*1.55;};
     const start=()=>{
       page=[];pages.push(page);
-      if(logo)page.push({type:'image',image:logo.image,href:logo.href,x:L,y:64,w:104,h:104*logo.height/logo.width});
-      const nameX=logo?L+128:L,nameWidth=logo?507:635;
-      text('SALES DOCUMENT',nameX,64,15,false,'left',MUTED);
-      let cy=99;cy+=block(company.name||'-',nameX,cy,nameWidth,logo?26:29,true)+12;
-      if(logo)cy=Math.max(cy,185);
-      cy+=block(company.address||'-',L,cy,635,18)+9;
-      cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),L,cy,635,16,false,MUTED);
-      text('ใบเสนอราคา',R,66,42,true,'right');text('QUOTATION',R,126,17,false,'right',MUTED);
+      // Keep the issuer in one aligned block beside a proportionate logo.
+      // Its width ends before the document heading, even for long addresses.
+      const nameX=logo?L+146:L,nameWidth=641-(nameX-L);
+      const logoHeight=logo?Math.min(120,120*logo.height/logo.width):0;
+      const logoWidth=logo?logoHeight*logo.width/logo.height:0;
+      if(logo)page.push({type:'image',image:logo.image,href:logo.href,x:L+(120-logoWidth)/2,y:78,w:logoWidth,h:logoHeight});
+      let cy=78;cy+=block(company.name||'-',nameX,cy,nameWidth,26,true)+14;
+      cy+=block(company.address||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
+      cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),nameX,cy,nameWidth,16,false,MUTED);
+      cy=Math.max(cy,78+logoHeight);
+      text('ใบเสนอราคา',R,76,39,true,'right');text('QUOTATION',R,128,17,false,'right',MUTED);
       const no=wrap(doc.document_number||'ตัวอย่าง',345,19,true,measure);
       text('เลขที่เอกสาร',R,165,15,false,'right',MUTED);no.forEach((s,i)=>text(s,R,193+i*29,19,true,'right'));
       const dy=193+no.length*29;text('วันที่ '+date(doc.issue_date),R,dy,18,false,'right');
-      const headBottom=Math.max(cy,dy+30)+22;line(L,headBottom,R,headBottom,INK,4);
+      const headBottom=Math.max(cy,dy+30)+28;line(L,headBottom,R,headBottom,INK,3);
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(doc.customer_address_snapshot||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
