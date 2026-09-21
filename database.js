@@ -143,6 +143,72 @@
       else if (modal.dataset.type === 'quotation' && session && orgId) { await addQuotation(data); modal.close(); }
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
   }, true);
+  const escapePrint = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  const previewDocument = async (number) => {
+    const doc = (await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${encodeURIComponent(number)}&select=*&limit=1`))[0];
+    if (!doc) throw new Error('ไม่พบเอกสาร กรุณาเข้าสู่ระบบแล้วลองใหม่');
+    const [companies, items] = await Promise.all([
+      request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address&limit=1`),
+      request(`/rest/v1/document_items?document_id=eq.${doc.id}&select=*&order=position.asc`)
+    ]);
+    const company = companies[0] || {};
+    const e = escapePrint;
+    const money = (value) => Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const date = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH') : '-';
+    const title = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน' }[doc.kind] || 'เอกสาร';
+    document.querySelector('#document-preview')?.remove();
+    const preview = document.createElement('section');
+    preview.id = 'document-preview';
+    preview.setAttribute('role', 'dialog');
+    preview.setAttribute('aria-label', 'ตัวอย่างเอกสาร');
+    preview.innerHTML = `<style>
+      #document-preview{position:fixed;inset:0;z-index:10000;overflow:auto;background:#e5e9ef;color:#172033;font:14px Tahoma,Arial,sans-serif}
+      #document-preview .print-tools{position:sticky;top:0;background:#fff;padding:12px 20px;display:flex;gap:12px;align-items:center;border-bottom:1px solid #ddd}
+      #document-preview button{padding:10px 16px;border:1px solid #ccd3df;border-radius:6px;cursor:pointer}
+      #document-preview .paper{box-sizing:border-box;background:white;width:210mm;max-width:100%;min-height:270mm;margin:24px auto;padding:16mm}
+      #document-preview h1{font-size:23px;margin:0 0 12px}#document-preview h2{font-size:20px;margin:0 0 10px}
+      #document-preview .print-head{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #24344e;padding-bottom:20px;margin-bottom:20px}
+      #document-preview .address{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+      #document-preview table{width:100%;border-collapse:collapse;margin-top:22px;font-size:13px;table-layout:fixed}
+      #document-preview th,#document-preview td{padding:10px 6px;border-bottom:1px solid #ddd;white-space:normal;overflow-wrap:anywhere;text-align:left}
+      #document-preview th{background:#f0f3f8}#document-preview .number{text-align:right}
+      #document-preview .totals{margin:24px 0 0 auto;width:280px;max-width:100%}#document-preview .totals p{display:flex;justify-content:space-between;gap:10px;padding:6px 0;margin:0}
+      #document-preview .signatures{display:flex;justify-content:space-between;gap:40px;margin-top:65px;text-align:center}#document-preview .signatures p{border-top:1px solid #999;padding-top:10px;flex:1}
+      @page{size:A4;margin:12mm}
+      @media print{body>*:not(#document-preview){display:none!important}#document-preview{position:static;background:white;overflow:visible}#document-preview .print-tools{display:none}#document-preview .paper{width:auto;max-width:none;min-height:0;margin:0;padding:0}#document-preview tr,#document-preview .totals,#document-preview .signatures{break-inside:avoid}#document-preview thead{display:table-header-group}}
+    </style><div class="print-tools"><button type="button" data-print-now>พิมพ์ / บันทึก PDF</button><button type="button" data-print-close>กลับไปยังรายการ</button><span>เลือก Save as PDF หรือ บันทึกเป็น PDF ในหน้าพิมพ์</span></div>
+    <article class="paper"><header class="print-head"><div><h2>${e(company.name)}</h2><div class="address">${e(company.address || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p></div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
+    <div class="address"><strong>ลูกค้า: ${e(doc.customer_name_snapshot)}</strong><br>${e(doc.customer_address_snapshot || '-')}<br>เลขประจำตัวผู้เสียภาษี ${e(doc.customer_tax_id_snapshot || '-')}</div>
+    ${doc.valid_until ? `<p>ยืนราคาถึง ${e(date(doc.valid_until))}</p>` : ''}${doc.due_date ? `<p>กำหนดชำระ ${e(date(doc.due_date))}</p>` : ''}
+    <table><thead><tr><th style="width:7%">ลำดับ</th><th style="width:39%">สินค้า / ขนาด</th><th style="width:14%">จำนวน</th><th class="number" style="width:20%">ราคาต่อหน่วย</th><th class="number" style="width:20%">รวม</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td><td>${e(item.product_name_snapshot)}<br>${e(item.specification_snapshot)}<br>${e(item.sku_snapshot)}</td><td>${e(item.quantity)} ${e(item.unit_snapshot)}</td><td class="number">${money(item.unit_price)}</td><td class="number">${money(item.line_total)}</td></tr>`).join('')}</tbody></table>
+    <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
+    <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
+    document.body.append(preview);
+    const previousTitle = document.title;
+    preview.querySelector('[data-print-close]').onclick = () => { preview.remove(); document.title = previousTitle; };
+    preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
+    preview.querySelector('[data-print-now]').focus();
+  };
+  const addPrintButtons = () => {
+    document.querySelectorAll('#quotation-body tr, #invoices tbody tr').forEach((row) => {
+      const number = row.cells[0]?.textContent.trim();
+      if (!/^(QT|BL|TI)-/.test(number || '') || row.querySelector('[data-print-document]')) return;
+      const printButton = document.createElement('button');
+      printButton.type = 'button'; printButton.className = 'ghost';
+      printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';
+      row.lastElementChild.append(printButton);
+    });
+  };
+  new MutationObserver(addPrintButtons).observe(document.querySelector('main'), { childList: true, subtree: true });
+  document.addEventListener('click', async (event) => {
+    const printButton = event.target.closest('[data-print-document]');
+    if (!printButton) return;
+    if (!session || !orgId) return login();
+    printButton.disabled = true;
+    try { await previewDocument(printButton.dataset.printDocument); }
+    catch (error) { alert(error.message); }
+    finally { printButton.disabled = false; }
+  });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
   if (location.hash === '#settings') setTimeout(() => window.go?.('settings'), 0);
 })();
