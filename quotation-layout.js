@@ -1,6 +1,6 @@
 // Shared drawing model for quotation screen, print, and downloadable PDF.
 (() => {
-  const W=1240,H=1754,L=83,R=1157,INK='#19334a',LINE='#c5cdd4',MUTED='#536174';
+  const W=1240,H=1754,L=83,R=1157,INK='#245b57',LINE='#c5d6d3',MUTED='#526d69',HEADER='#edf5f3';
   const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const date=s=>s?new Date(s+'T00:00:00').toLocaleDateString('th-TH'):'-';
@@ -57,7 +57,7 @@
     };
     const widths=[50,550,100,130,90,154],xs=[L];widths.forEach(w=>xs.push(xs.at(-1)+w));
     const tableHeader=()=>{text('รายการสินค้า / ขนาด',L,y,20,true);text(items.length+' รายการ',R,y,16,false,'right',MUTED);y+=37;tableTop=y;
-      widths.forEach((w,i)=>rect(xs[i],y,w,64,'#f0f3f5'));line(L,y,R,y,INK,3);
+      widths.forEach((w,i)=>rect(xs[i],y,w,64,HEADER));line(L,y,R,y,INK,3);
       [['ลำดับ','NO.'],['รายการสินค้า / ขนาด','DESCRIPTION / SIZE'],['จำนวน','QTY / UNIT'],['ราคาต่อหน่วย','UNIT PRICE'],['ลด (%)','DISCOUNT'],['จำนวนเงิน','AMOUNT']].forEach(([th,en],i)=>{const center=xs[i]+widths[i]/2;text(th,center,y+11,16,true,'center');text(en,center,y+36,12,false,'center',MUTED);});y+=64;};
     start();tableHeader();
     items.forEach((item,index)=>{

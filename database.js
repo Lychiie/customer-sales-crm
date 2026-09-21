@@ -60,10 +60,10 @@
     });
   };
   const syncQuotations = async () => {
-    const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
+    const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=id,document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
     const status = { draft: 'ร่าง', sent: 'รออนุมัติ', approved: 'อนุมัติแล้ว', cancelled: 'ยกเลิก' };
     const thaiDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
-    state.quotations = rows.map((quote) => ({ no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, status: status[quote.status] || quote.status }));
+    state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, status: status[quote.status] || quote.status }));
   };
   const syncBillingNotes = async () => {
     const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,kind&order=created_at.desc`);
@@ -98,7 +98,7 @@
     const quote = state.quotations[index]; if (!quote) return;
     const cell = row.lastElementChild;
     if (quote.status === 'ร่าง') cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
-    if (quote.status === 'อนุมัติแล้ว') cell.innerHTML = `<button class="ghost" data-billing="${quote.no}">สร้างใบวางบิล</button>`;
+    // Billing creation is intentionally not offered in the quotation list.
   });
   const syncAll = async () => { await loadOrganization(); await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile()]); separateTaxInvoices(); render(); renderDocumentActions(); await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]); };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
@@ -174,6 +174,28 @@
     const action = event.target.closest('[data-approve],[data-billing],[data-tax-invoice]'); if (!action || !session || !orgId) return;
     try { if (action.dataset.approve) await approveQuotation(action.dataset.approve); if (action.dataset.billing) await createBillingNote(action.dataset.billing); if (action.dataset.taxInvoice) await createTaxInvoice(action.dataset.taxInvoice); }
     catch (error) { alert(error.message); }
+  });
+  const deletingQuotations = new Set();
+  document.addEventListener('click', async event => {
+    const action=event.target.closest('[data-delete-quotation]');
+    if (!action) return;
+    if (!session || !orgId) return login();
+    const id=action.dataset.deleteQuotation;
+    if (deletingQuotations.has(id)) return;
+    const quote=state.quotations.find(q=>q.id===id);
+    if (!quote) return;
+    deletingQuotations.add(id);
+    const controls=[...action.closest('tr').querySelectorAll('button')];
+    controls.forEach(control=>control.disabled=true);action.textContent='กำลังลบ…';
+    try {
+      await window.QuotationActions.remove(request,orgId,id);
+      state.quotations=state.quotations.filter(q=>q.id!==id);
+      save();render();renderDocumentActions();
+      let notice=document.querySelector('#quotation-action-notice');
+      if (!notice) {notice=document.createElement('p');notice.id='quotation-action-notice';notice.setAttribute('role','status');document.querySelector('#quotations').prepend(notice);}
+      notice.textContent=`ลบใบเสนอราคา ${quote.no} แล้ว (ลบถาวร ไม่มีปุ่มกู้คืนในระบบ)`;
+    } catch(error) {alert(error.message);}
+    finally {deletingQuotations.delete(id);controls.forEach(control=>control.disabled=false);action.textContent='ลบ';}
   });
   document.querySelector('#modal-form').addEventListener('submit', async (event) => {
     if (event.submitter?.value === 'cancel' || !['login', 'customer', 'product', 'quotation'].includes(modal.dataset.type)) return;
@@ -277,6 +299,15 @@
     preview.querySelector('[data-print-now]').focus();
   };
   const addPrintButtons = () => {
+    document.querySelectorAll('#quotation-body tr').forEach(row=>{
+      const number=row.cells[0]?.textContent.trim();
+      const quote=state.quotations.find(q=>q.no===number);
+      if (!quote?.id || row.querySelector('[data-delete-quotation]')) return;
+      const remove=document.createElement('button');remove.type='button';remove.className='ghost';
+      remove.dataset.deleteQuotation=quote.id;remove.textContent='ลบ';remove.style.color='#b42332';
+      remove.title=`ลบใบเสนอราคา ${quote.no} ถาวรทันที`;remove.setAttribute('aria-label',`ลบใบเสนอราคา ${quote.no}`);
+      row.lastElementChild.append(remove);
+    });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
       if (!/^(QT|BL|TI)-/.test(number || '') || row.querySelector('[data-print-document]')) return;
