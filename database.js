@@ -38,13 +38,18 @@
     await syncProducts(); render();
   };
   document.querySelector('#modal-form').addEventListener('submit', async (event) => {
-    if (event.submitter.value === 'cancel') return;
+    if (event.submitter.value === 'cancel' || !['login', 'customer', 'product'].includes(modal.dataset.type)) return;
+    // The original prototype stores the row locally and closes this dialog.
+    // Handle database-backed forms first, so the screen only changes after
+    // Supabase has confirmed that the record was saved.
+    event.preventDefault();
+    event.stopImmediatePropagation();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      if (modal.dataset.type === 'login') { event.preventDefault(); session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(data) }); localStorage.setItem('flowbill-session', JSON.stringify(session)); await syncAll(); modal.close(); label(); }
-      else if (modal.dataset.type === 'customer' && session && orgId) { await request('/rest/v1/customers', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: orgId, name: data.name, contact_name: data.contact || null, tax_id: data.taxId || null, phone: data.phone || null, credit_term_days: parseInt(data.terms) || 30 }) }); await syncCustomers(); render(); }
-      else if (modal.dataset.type === 'product' && session && orgId) await addProduct(data);
+      if (modal.dataset.type === 'login') { session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(data) }); localStorage.setItem('flowbill-session', JSON.stringify(session)); await syncAll(); modal.close(); label(); }
+      else if (modal.dataset.type === 'customer' && session && orgId) { await request('/rest/v1/customers', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: orgId, name: data.name, contact_name: data.contact || null, tax_id: data.taxId || null, phone: data.phone || null, credit_term_days: parseInt(data.terms) || 30 }) }); await syncCustomers(); render(); modal.close(); }
+      else if (modal.dataset.type === 'product' && session && orgId) { await addProduct(data); modal.close(); }
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
-  });
+  }, true);
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
 })();
