@@ -28,6 +28,10 @@ window.buildSalesPDF = async (company, doc, items) => {
     }
   };
   const rule = () => { ctx.strokeStyle = '#cbd2db'; ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width-margin, y); ctx.stroke(); y += 20; };
+  if(doc.kind==='quotation' && window.QuotationLayout){
+    const layout=await window.QuotationLayout.prepare(company,doc,items);
+    pages.push(...window.QuotationLayout.draw(layout,()=>document.createElement('canvas')));
+  } else {
   newPage();
   text(company.name || '-', 32, true);
   text(company.address || '-'); text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`);
@@ -54,6 +58,7 @@ window.buildSalesPDF = async (company, doc, items) => {
   text(`VAT ${doc.vat_rate}%: ${money(doc.vat_amount)} บาท`);
   text(`ยอดสุทธิ: ${money(doc.grand_total)} บาท`, 30, true);
   y += 55; text('ผู้จัดทำ / ผู้รับเงิน ____________________    ผู้รับเอกสาร ____________________', 22);
+  }
   const encoder = new TextEncoder(), chunks = [], offsets = [0]; let length = 0;
   const append = data => { const bytes = typeof data === 'string' ? encoder.encode(data) : data; chunks.push(bytes); length += bytes.length; };
   const object = (id, content) => { offsets[id] = length; append(`${id} 0 obj\n${content}\nendobj\n`); };

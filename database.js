@@ -223,6 +223,11 @@
     <table><thead><tr><th style="width:7%">ลำดับ</th><th style="width:39%">สินค้า / ขนาด</th><th style="width:14%">จำนวน</th><th class="number" style="width:20%">ราคาต่อหน่วย</th><th class="number" style="width:20%">รวม</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td><td class="item-description">${e([item.product_name_snapshot,item.specification_snapshot,item.sku_snapshot].filter(value => value != null && String(value).trim()).join(' '))}</td><td>${e(item.quantity)} ${e(item.unit_snapshot)}</td><td class="number">${money(item.unit_price)}</td><td class="number">${money(item.line_total)}</td></tr>`).join('')}</tbody></table>
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
     <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
+    if (doc.kind === 'quotation' && window.QuotationLayout) {
+      const layout = await window.QuotationLayout.prepare(company, doc, items);
+      preview.querySelector('.paper').remove();
+      preview.insertAdjacentHTML('beforeend', window.QuotationLayout.styles + window.QuotationLayout.toSVG(layout));
+    }
     document.body.append(preview);
     if (doc.kind === 'tax_invoice' && window.ContinuousForm) {
       const formButton = document.createElement('button'); formButton.type = 'button';
