@@ -35,14 +35,14 @@ window.buildSalesPDF = async (company, doc, items) => {
   } else {
   newPage();
   text(company.name || '-', 32, true);
-  text(company.address || '-'); text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`);
+  text(window.DocumentAddress.format(company.address) || '-'); text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`);
   y += 16; rule(); text(titles[doc.kind] || 'เอกสาร', 32, true);
   text(`เลขที่ ${doc.document_number}`);
   text(`วันที่ ${doc.issue_date ? new Date(doc.issue_date + 'T00:00:00').toLocaleDateString('th-TH') : '-'}`);
   if (doc.status === 'draft') text('สถานะ: ร่าง');
   if (doc.status === 'paid') text('สถานะ: ชำระแล้ว');
   y += 14; text(`ลูกค้า: ${doc.customer_name_snapshot}`, 26, true);
-  text(doc.customer_address_snapshot || '-'); text(`เลขประจำตัวผู้เสียภาษี ${doc.customer_tax_id_snapshot || '-'}`);
+  text(window.DocumentAddress.format(doc.customer_address_snapshot) || '-'); text(`เลขประจำตัวผู้เสียภาษี ${doc.customer_tax_id_snapshot || '-'}`);
   if (doc.valid_until) text(`ยืนราคาถึง ${doc.valid_until}`);
   if (doc.due_date) text(`กำหนดชำระ ${doc.due_date}`);
   y += 14; rule();

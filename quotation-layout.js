@@ -36,7 +36,7 @@
       const logoWidth=logo?logoHeight*logo.width/logo.height:0;
       if(logo)page.push({type:'image',image:logo.image,href:logo.href,x:L+(120-logoWidth)/2,y:78,w:logoWidth,h:logoHeight});
       let cy=78;cy+=block(company.name||'-',nameX,cy,nameWidth,26,true)+14;
-      cy+=block(company.address||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
+      cy+=block(window.DocumentAddress.format(company.address)||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
       cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),nameX,cy,nameWidth,16,false,MUTED);
       cy=Math.max(cy,78+logoHeight);
       text(title,R,76,39,true,'right');text(english,R,128,17,false,'right',MUTED);
@@ -45,7 +45,7 @@
       const dy=193+no.length*29;text('วันที่ '+date(doc.issue_date),R,dy,18,false,'right');
       const headBottom=Math.max(cy,dy+30)+28;line(L,headBottom,R,headBottom,INK,3);
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
-      const address=wrap(doc.customer_address_snapshot||'-',595,18,false,measure);
+      const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
       const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['ยืนราคาถึง',date(doc.valid_until)],['กำหนดส่งสินค้า',details.deliveryTerms||'-'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,365,18,true,measure)}));
       const detailHeight=55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0);

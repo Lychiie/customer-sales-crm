@@ -7,7 +7,7 @@
   const money=value=>Number(value||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const date=value=>value?new Date(value+'T00:00:00').toLocaleDateString('th-TH'):'';
   const fields={
-    company:['ชื่อบริษัท',31.36,14.51,174,9],companyAddress:['ที่อยู่บริษัท',31.40,19.89,174,6],companyTax:['เลขผู้เสียภาษีบริษัท',31.55,26.76,174,6],
+    company:['ชื่อบริษัท',31.36,14.51,174,9],companyAddress:['ที่อยู่บริษัท',31.40,19.89,174,8],companyTax:['เลขผู้เสียภาษีบริษัท',31.55,26.76,174,6],
     customer:['ชื่อลูกค้า',34.66,40.25,101,10],branch:['สาขาลูกค้า',30.76,51.58,104,6],tax:['เลขผู้เสียภาษีลูกค้า',50.61,56.07,84,6],address:['ที่อยู่ลูกค้า',22.82,61.87,112,13],
     number:['เลขที่เอกสาร',176.60,40.76,31,6],date:['วันที่',176.41,46.44,31,6],due:['กำหนดชำระ',176.60,53.44,31,6],terms:['เครดิต (ช่องเสริม)',176.60,60.47,31,6],reference:['อ้างอิง (ช่องเสริม)',176.60,67.50,31,6],employee:['พนักงานขาย (ช่องเสริม)',176.60,74.53,31,6],po:['เลขที่ใบสั่งซื้อ (ช่องเสริม)',176.60,81.56,31,6],
     notes:['หมายเหตุ',6.67,206.69,124,21],amountWords:['จำนวนเงินตัวอักษร',6.67,234.11,124,7],vatRate:['อัตรา VAT',164.53,227.52,10,6],
@@ -134,6 +134,7 @@
             if(font<10){font=10;warnings.push('ที่อยู่ยาวเกิน 2 บรรทัด กรุณาย่อที่อยู่ก่อนพิมพ์');}
             return make(lines.join('\n'),p.x,p.y,w,h,align,font,FONT,false,6.33);
           }
+          if(key==='companyAddress')return make(window.DocumentAddress.format(text),p.x,p.y,w,h,align,12,'Browallia New, Tahoma, sans-serif',true,3.2);
           const heading=key.startsWith('company');return make(text,p.x,p.y,w,h,align,heading?(key==='company'?24:12):cfg.font,heading?'Browallia New, Tahoma, sans-serif':FONT,heading);
         };
         const header={company:company.name||'',companyAddress:company.address||'',companyTax:company.tax_id?'เลขประจำตัวผู้เสียภาษี '+company.tax_id:'',customer:doc.customer_name_snapshot||'',branch:doc.customer_branch_snapshot||'',tax:doc.customer_tax_id_snapshot||'',address:doc.customer_address_snapshot||'',number:doc.document_number,date:date(doc.issue_date),due:date(doc.due_date),terms:doc.credit_term_snapshot||'',reference:doc.reference||'',employee:doc.employee_name_snapshot||'',po:doc.po_number||''};
