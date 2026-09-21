@@ -4,6 +4,16 @@
   taxPage.id = 'tax-invoices'; taxPage.className = 'page';
   taxPage.innerHTML = '<article class="panel settings-card"><h3>ใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูรายการใบกำกับภาษี</p></article>';
   document.querySelector('#invoices').after(taxPage);
+  for (const [id, title, description] of [
+    ['delivery-notes', 'ใบส่งสินค้า', 'เอกสารสำหรับแสดงรายการสินค้าและการรับมอบสินค้า'],
+    ['cash-bills', 'บิลเงินสด', 'เอกสารสำหรับรายการขายที่รับชำระเงินทันที']
+  ]) {
+    pageMeta[id] = ['งานขาย', title];
+    const page = document.createElement('section');
+    page.id = id; page.className = 'page';
+    page.innerHTML = `<article class="panel table-panel"><div class="panel-title"><div><h3>${title}</h3><p>${description}</p></div></div><div class="empty-state"><h2>ยังไม่มี${title}</h2><p>เตรียมหน้าเมนูแล้ว ระบบสร้างและบันทึกเอกสารประเภทนี้ยังไม่เปิดใช้งาน</p></div></article>`;
+    document.querySelector('#settings').before(page);
+  }
   const config = window.SUPABASE_CONFIG;
   let session = JSON.parse(localStorage.getItem('flowbill-session') || 'null');
   let orgId = localStorage.getItem('flowbill-org-id');
@@ -260,5 +270,5 @@
     finally { printButton.disabled = false; }
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
-  if (['#settings', '#tax-invoices'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if (['#settings', '#tax-invoices', '#delivery-notes', '#cash-bills'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();
