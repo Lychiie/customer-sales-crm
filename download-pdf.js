@@ -28,9 +28,10 @@ window.buildSalesPDF = async (company, doc, items) => {
     }
   };
   const rule = () => { ctx.strokeStyle = '#cbd2db'; ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width-margin, y); ctx.stroke(); y += 20; };
-  if(doc.kind==='quotation' && window.QuotationLayout){
-    const layout=await window.QuotationLayout.prepare(company,doc,items);
-    pages.push(...window.QuotationLayout.draw(layout,()=>document.createElement('canvas')));
+  const documentLayout=doc.kind==='quotation'?window.QuotationLayout:doc.kind==='billing_note'?window.BillingLayout:null;
+  if(documentLayout){
+    const layout=await documentLayout.prepare(company,doc,items);
+    pages.push(...documentLayout.draw(layout,()=>document.createElement('canvas')));
   } else {
   newPage();
   text(company.name || '-', 32, true);
