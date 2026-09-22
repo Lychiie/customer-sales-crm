@@ -95,6 +95,7 @@
     const billingLink = document.createElement('button'); billingLink.className = 'ghost';
     billingLink.textContent = 'ไปใบเสนอราคาที่อนุมัติแล้ว'; billingLink.onclick = () => go('quotations');
     taxPanel.querySelector('.panel-title').append(billingLink);
+    window.TaxPaymentFilters.mount(taxPanel,orgId);
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {
     const quote = state.quotations.find(q=>q.no===row.cells[0]?.textContent.trim()); if (!quote) return;
@@ -341,7 +342,7 @@
     preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
     preview.querySelector('[data-print-now]').focus();
   };
-  window.DocumentPayment.bind(request, () => orgId, () => Boolean(session), login);
+  window.DocumentPayment.bind(request, () => orgId, () => Boolean(session), login, () => window.TaxPaymentFilters.refresh());
   const openingDelivery = new Set();
   const addPrintButtons = () => {
     document.querySelectorAll('#quotation-body tr').forEach(row=>{
