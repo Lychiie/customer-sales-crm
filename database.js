@@ -191,8 +191,8 @@
   const createBillingNote = async (number) => {
     const source = (await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${number}&select=*&limit=1`))[0];
     if (!source) throw new Error('ไม่พบใบเสนอราคา');
-    const billNumber = `BL-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${String(Date.now()).slice(-5)}`;
-    const bills = await request('/rest/v1/documents', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ organization_id: orgId, kind: 'billing_note', document_number: billNumber, status: 'draft', customer_id: source.customer_id, customer_name_snapshot: source.customer_name_snapshot, customer_tax_id_snapshot: source.customer_tax_id_snapshot, customer_address_snapshot: source.customer_address_snapshot, issue_date: new Date().toISOString().slice(0, 10), due_date: source.due_date, subtotal: source.subtotal, discount_amount: source.discount_amount, taxable_amount: source.taxable_amount, vat_rate: source.vat_rate, vat_amount: source.vat_amount, grand_total: source.grand_total, source_document_id: source.id, created_by: session.user.id }) });
+    const billNumber = null; // Assigned atomically by the billing-year database trigger.
+    const bills = await request('/rest/v1/documents', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ organization_id: orgId, kind: 'billing_note', document_number: billNumber, status: 'draft', customer_id: source.customer_id, customer_name_snapshot: source.customer_name_snapshot, customer_tax_id_snapshot: source.customer_tax_id_snapshot, customer_address_snapshot: source.customer_address_snapshot, issue_date: window.QuotationEditor.issueDate(), due_date: source.due_date, subtotal: source.subtotal, discount_amount: source.discount_amount, taxable_amount: source.taxable_amount, vat_rate: source.vat_rate, vat_amount: source.vat_amount, grand_total: source.grand_total, source_document_id: source.id, created_by: session.user.id }) });
     const items = await request(`/rest/v1/document_items?document_id=eq.${source.id}&select=position,product_variant_id,sku_snapshot,product_name_snapshot,specification_snapshot,unit_snapshot,quantity,unit_price,discount_amount,line_total`);
     if (items.length) await request('/rest/v1/document_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ ...item, document_id: bills[0].id }))) });
     await syncAll();
@@ -407,7 +407,7 @@
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(?:(?:QT|BL|TI)-|QT\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
+      if (!/^(?:(?:QT|BL|TI)-|(?:QT|BL)\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';
