@@ -117,7 +117,8 @@
     controlButton.onclick=async()=>{if(!session||!orgId)return login();await window.TaxInvoiceControl.open(request,orgId);};
     const taxActions=document.createElement('div');taxActions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';taxActions.append(controlButton,createButton);
     taxPanel.querySelector('.panel-title').append(taxActions);
-    window.TaxPaymentFilters.mount(taxPanel,orgId);
+    // Classification controls live in the document control center only.
+    taxPanel.querySelector('.panel-title p')?.remove();
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {
     const quote = state.quotations.find(q=>q.no===row.cells[0]?.textContent.trim()); if (!quote) return;
@@ -134,7 +135,7 @@
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
     });
     separateTaxInvoices(); render(); renderDocumentActions();
-    await window.TaxInvoiceControl.configure(request,orgId);
+    await window.TaxInvoiceControl.configure(request,orgId,syncAll);
     await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]);
   };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
