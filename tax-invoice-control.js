@@ -51,8 +51,8 @@
         root.querySelectorAll('[data-category]').forEach(button=>{const key=button.dataset.category;button.textContent=`${labels[key]} (${result.counts[key]})`;button.classList.toggle('active',key===filters.tab);button.setAttribute('aria-current',String(key===filters.tab));});
         const rows=result.rows.slice(pageIndex*pageSize,(pageIndex+1)*pageSize);
         root.querySelector('tbody').innerHTML=rows.length?rows.map((d,i)=>`<tr><td>${pageIndex*pageSize+i+1}</td><td><button type="button" class="text-button tic-number" data-print-document="${escape(d.document_number)}" aria-label="เปิดใบกำกับภาษี ${escape(d.document_number)}">${escape(d.document_number)}</button></td><td>${escape(date(d.issue_date))}</td><td>${escape(d.customer_name_snapshot)}<small>${escape(d.customer_tax_id_snapshot||'')}</small></td><td>${escape(date(d.due_date||d.issue_date))}</td><td class="tic-right">${money(d.grand_total)}</td><td>${labels[category(d)]}</td><td><button type="button" class="ghost" data-print-document="${escape(d.document_number)}">ดู / พิมพ์ PDF</button></td></tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:32px">ไม่พบเอกสารตามตัวกรองนี้</td></tr>';
-        root.querySelector('thead tr').lastElementChild.textContent==='เปิดเอกสาร'&&root.querySelector('thead tr').lastElementChild.remove();
-        root.querySelectorAll('tbody tr').forEach(row=>{if(row.children.length>1)row.lastElementChild.remove();else row.firstElementChild.colSpan=7;});
+        root.querySelector('thead tr').lastElementChild.textContent='ลบ';
+        root.querySelectorAll('tbody tr').forEach(row=>{if(row.children.length>1)row.lastElementChild.replaceChildren();else row.firstElementChild.colSpan=8;});
         window.TaxInvoiceDelete.mount(root,rows,request,org,context.onDeleted||load);
         root.querySelector('[data-summary]').textContent=`${labels[filters.tab]} · ${result.rows.length} ใบที่ตรงตัวกรอง จากเอกสารทั้งหมด ${documents.length} ใบ`;
         root.querySelector('[data-paging]').textContent=`หน้า ${pageIndex+1} / ${pages} · แสดง ${rows.length} ใบต่อหน้านี้`;

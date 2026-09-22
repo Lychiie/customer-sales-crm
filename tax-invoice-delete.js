@@ -38,7 +38,7 @@
       const doc=rows[index];if(!doc)return;
       const button=document.createElement('button');button.type='button';button.className='ghost';button.textContent='ลบ';button.style.cssText='color:#b42332;margin-left:8px';button.setAttribute('aria-label',`ลบใบกำกับภาษี ${doc.document_number}`);
       button.disabled=doc.payment_received===true;if(button.disabled)button.title='ชำระเงินแล้ว ไม่สามารถลบได้';
-      button.onclick=()=>ask(request,org,doc,onDeleted);row.children[1].append(button);
+      button.onclick=()=>ask(request,org,doc,onDeleted);row.lastElementChild.append(button);
     });
   };
   window.TaxInvoiceDelete={remove,mount};
