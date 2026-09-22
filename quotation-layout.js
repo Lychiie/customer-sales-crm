@@ -65,7 +65,7 @@
         leftY+=block('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),L,leftY,630,15,false,MUTED);
         text('รายละเอียดการวางบิล',805,customerY,14,true,'left',MUTED);
         let rightY=customerY+30;
-        for(const [label,value] of [['เอกสาร',items.length+' ใบกำกับภาษี'],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดชำระ',cashBilling?cashDue:billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
+        for(const [label,value] of [['เอกสารจำนวน',items.length+' ฉบับ'],['เงื่อนไขชำระเงิน',details.paymentTerms||'-'],['กำหนดชำระ',cashBilling?cashDue:billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
           const labelLines=wrap(label,102,15,false,measure);
           labelLines.forEach((s,i)=>text(s,805,rightY+i*26,15,false,'left',MUTED));
           const lines=wrap(value,242,17,false,measure);
