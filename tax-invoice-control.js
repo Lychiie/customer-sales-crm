@@ -54,6 +54,7 @@
         root.querySelector('thead tr').lastElementChild.textContent='ลบ';
         root.querySelectorAll('tbody tr').forEach(row=>{if(row.children.length>1)row.lastElementChild.replaceChildren();else row.firstElementChild.colSpan=8;});
         window.TaxInvoiceDelete.mount(root,rows,request,org,context.onDeleted||load);
+        window.BillingCreate.mount(root,rows,request,org,context.onDeleted||load);
         root.querySelector('[data-summary]').textContent=`${labels[filters.tab]} · ${result.rows.length} ใบที่ตรงตัวกรอง จากเอกสารทั้งหมด ${documents.length} ใบ`;
         root.querySelector('[data-paging]').textContent=`หน้า ${pageIndex+1} / ${pages} · แสดง ${rows.length} ใบต่อหน้านี้`;
         root.querySelector('[data-prev]').disabled=pageIndex===0;root.querySelector('[data-next]').disabled=pageIndex>=pages-1;
