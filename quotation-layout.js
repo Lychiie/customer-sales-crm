@@ -79,7 +79,28 @@
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
     if(pages.length===1){while(y+32<=1040){widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}
     y+=24;
-    const notes=wrap(details.notes||'-',R-L-40,18,false,measure);let at=0;
+    if(billing){
+      const account=company.payment_account||{};
+      const fields=[
+        {label:'ธนาคาร',value:account.bank||'—',x:L+24,width:265},
+        {label:'ชื่อบัญชี',value:account.name||'—',x:L+309,width:430},
+        {label:'เลขที่บัญชี',value:account.number||'—',x:L+759,width:291}
+      ].map(field=>({...field,lines:wrap(field.value,field.width,21,true,measure)}));
+      const cheque=wrap('กรณีชำระด้วยเช็ค: สั่งจ่ายในนาม '+(account.cheque_payee||company.name||'-'),R-L-48,17,false,measure);
+      const cardHeight=154+Math.max(...fields.map(field=>field.lines.length))*30+cheque.length*25;
+      if(cardHeight>600)throw Error('ข้อมูลบัญชีรับชำระยาวเกินไป กรุณาตรวจข้อมูลก่อนพิมพ์');
+      if(y+cardHeight+24+310>1630){start();y+=20;}
+      rect(L,y,R-L,cardHeight);rect(L,y,R-L,48,HEADER);line(L,y,L,y+cardHeight,INK,4);
+      text('บัญชีรับชำระค่าสินค้า',L+24,y+14,19,true);
+      text('PAYMENT ACCOUNT',R-24,y+17,13,false,'right',MUTED);
+      fields.forEach(field=>{text(field.label,field.x,y+66,15,false,'left',MUTED);field.lines.forEach((s,i)=>text(s,field.x,y+94+i*30,21,true));});
+      const chequeY=y+cardHeight-40-cheque.length*25;
+      line(L+24,chequeY-12,R-24,chequeY-12);
+      cheque.forEach((s,i)=>text(s,L+24,chequeY+i*25,17));
+      text('โปรดระบุเลขที่ใบวางบิลเมื่อแจ้งชำระเงิน',L+24,y+cardHeight-29,15,false,'left',MUTED);
+      y+=cardHeight+24;
+    }
+    const notes=billing?[]:wrap(details.notes||'-',R-L-40,18,false,measure);let at=0;
     while(at<notes.length){if(y+110>1510){start();y+=16;}const capacity=Math.max(1,Math.floor((1510-y-60)/28)),part=notes.slice(at,at+capacity),h=60+part.length*28;
       rect(L,y,R-L,h);text('หมายเหตุ / REMARKS'+(at?' (ต่อ)':''),L+20,y+15,15,true,'left',MUTED);part.forEach((s,i)=>text(s,L+20,y+48+i*28,18));y+=h+24;at+=part.length;
     }
