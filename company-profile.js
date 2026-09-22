@@ -25,6 +25,12 @@
   let rows=[],offset=0;for(;;){const batch=await request(`/storage/v1/object/list/${bucket}`,{method:'POST',body:JSON.stringify({prefix:`${org}/${type}`,limit:100,offset,sortBy:{column:'name',order:'asc'}})});if(!Array.isArray(batch))throw Error('โหลดรายการไฟล์ไม่สำเร็จ');if(!batch.length)break;rows.push(...batch.filter(x=>x.id));offset+=batch.length;}
   return rows.map(x=>({...x,type,path:`${org}/${type}/${x.name}`}));
  };
+ const deleteFile=async(request,org,item,confirmation)=>{
+  if(confirmation!=='ลบ')throw Error('กรุณาพิมพ์คำว่า ลบ เพื่อยืนยัน');
+  if(!org||!Object.hasOwn(types,item?.type)||item.path!==`${org}/${item.type}/${item.name}`||!/^[-0-9a-f]+--[0-9a-f]+\.(pdf|png|jpg)$/.test(item.name))throw Error('ไม่พบไฟล์ของบริษัทนี้ กรุณารีเฟรช');
+  const deleted=await request(`/storage/v1/object/${bucket}`,{method:'DELETE',body:JSON.stringify({prefixes:[item.path]})});
+  if(!Array.isArray(deleted)||deleted.length!==1||deleted[0].name!==item.path)throw Error('ยังยืนยันการลบไม่ได้ ไฟล์อาจถูกลบหรือเปลี่ยนชื่อแล้ว หรือคุณไม่มีสิทธิ์ กรุณารีเฟรชรายการ');
+ };
  let urls=[];
  const uploadForm=type=>`<form data-upload data-kind="${type}" class="cp-upload"><label class="field"><span>${type==='other'?'เลือกไฟล์':'เลือกภาพ'}</span><input name="file" type="file" accept="${type==='other'?'.pdf,.png,.jpg,.jpeg':'.png,.jpg,.jpeg'}" required><small class="cp-note" data-selected>ยังไม่ได้เลือกไฟล์</small></label><button class="primary" type="submit">${type==='logo'?'อัปโหลดโลโก้':type==='signature'?'อัปโหลดลายเซ็น':'อัปโหลดไฟล์'}</button></form>`;
  const mount=async(root,{request,org,user,organization,onSaved})=>{
@@ -49,8 +55,30 @@
    save.onclick=async()=>{if(pending)return;let target;try{target=renameTarget(org,item,input.value);}catch(e){error.textContent=e.message;return;}if(target.name===item.name){close();return;}pending=true;save.disabled=cancel.disabled=input.disabled=true;error.textContent='';try{await request('/storage/v1/object/move',{method:'POST',body:JSON.stringify({bucketId:bucket,sourceKey:item.path,destinationKey:target.path})});close();notice.textContent=`✓ เปลี่ยนชื่อเป็น ${target.label} แล้ว`;root.querySelector('input[type=search]').value='';await refresh();}catch(e){error.textContent=`${e.message} หากไม่แน่ใจผล ให้ปิดและรีเฟรชรายการก่อนลองใหม่`;notice.textContent='กรุณารีเฟรชเพื่อตรวจชื่อไฟล์ล่าสุด';}finally{pending=false;save.disabled=cancel.disabled=input.disabled=false;}};
    document.body.append(dialog);dialog.showModal();input.focus();input.select();
   };
+  const deleteDialog=item=>{
+   if(document.querySelector('#company-delete-dialog'))return;
+   const dialog=document.createElement('dialog');dialog.id='company-delete-dialog';dialog.setAttribute('aria-labelledby','company-delete-title');dialog.style.cssText='width:min(480px,calc(100% - 32px));padding:24px;border:0;border-radius:14px';
+   dialog.innerHTML='<h3 id="company-delete-title">ยืนยันลบไฟล์บริษัท</h3><p data-name style="overflow-wrap:anywhere"></p><p>ไฟล์นี้จะถูกลบถาวรและไม่สามารถกู้คืนผ่านระบบได้</p><label style="display:block">พิมพ์คำว่า ลบ เพื่อยืนยัน<input aria-label="พิมพ์คำว่า ลบ เพื่อยืนยัน" autocomplete="off" style="display:block;width:100%;padding:12px;margin:10px 0;border:1px solid #dfe3ea;border-radius:8px;font:inherit"></label><p data-error role="alert" style="color:#b42332"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="button" class="primary" style="background:#b42332" data-delete-confirm disabled>ลบถาวร</button></div>';
+   dialog.querySelector('[data-name]').textContent=`ไฟล์: ${filename(item.name)}`;
+   const input=dialog.querySelector('input'),confirm=dialog.querySelector('[data-delete-confirm]'),cancel=dialog.querySelector('[data-cancel]'),error=dialog.querySelector('[data-error]');
+   let pending=false;const close=()=>{dialog.close();dialog.remove();};cancel.onclick=close;
+   input.oninput=()=>{confirm.disabled=pending||input.value!=='ลบ';};
+   dialog.oncancel=e=>{e.preventDefault();if(!pending)close();};
+   confirm.onclick=async()=>{
+    if(pending||input.value!=='ลบ')return;
+    pending=true;confirm.disabled=cancel.disabled=input.disabled=true;error.textContent='';
+    try{await deleteFile(request,org,item,input.value);}
+    catch(e){error.textContent=e.message+' หากไม่แน่ใจผล ให้ปิดและรีเฟรชก่อนลองใหม่';pending=false;cancel.disabled=input.disabled=false;input.value='';return;}
+    close();urls.forEach(URL.revokeObjectURL);urls=[];
+    rows=rows.filter(x=>x.path!==item.path);render();
+    for(const t of ['logo','signature'])root.querySelector(`[data-${t}-preview]`).replaceChildren();
+    notice.textContent=`✓ ลบไฟล์ ${filename(item.name)} แล้ว`;
+    try{await refresh();}catch(e){notice.textContent='ลบไฟล์แล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณากดรีเฟรช';}
+   };
+   document.body.append(dialog);dialog.showModal();input.focus();
+  };
   const download=async item=>{const blob=await request(`/storage/v1/object/authenticated/${bucket}/${item.path}`,{responseType:'blob'});const url=URL.createObjectURL(blob);urls.push(url);const a=document.createElement('a');a.href=url;a.download=filename(item.name);a.textContent=`บันทึก ${filename(item.name)}`;const open=document.createElement('a');open.href=url;open.target='_blank';open.rel='noopener';open.textContent='เปิดไฟล์';notice.replaceChildren(document.createTextNode('ไฟล์พร้อมแล้ว: '),a,open);};
-  const render=()=>{const q=root.querySelector('input[type=search]').value.trim().toLowerCase();const visible=rows.filter(x=>filename(x.name).toLowerCase().includes(q));files.innerHTML=`<table><thead><tr><th>ชื่อไฟล์</th><th>วันที่อัปโหลด</th><th>ขนาด</th><th>จัดการไฟล์</th></tr></thead><tbody>${visible.map((x,i)=>`<tr><td>${esc(filename(x.name))}</td><td>${esc(new Date(x.created_at).toLocaleDateString('th-TH'))}</td><td>${(Number(x.metadata?.size||0)/1024/1024).toFixed(2)} MB</td><td><button type="button" class="ghost" data-download="${i}">ดาวน์โหลด</button> <button type="button" class="ghost" data-rename="${i}">เปลี่ยนชื่อ</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีไฟล์ที่ตรงกับรายการนี้</td></tr>'}</tbody></table>`;files.querySelectorAll('[data-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await download(visible[Number(b.dataset.download)]);}catch(e){notice.textContent=e.message;}finally{b.disabled=false;}});files.querySelectorAll('[data-rename]').forEach(b=>b.onclick=()=>renameDialog(visible[Number(b.dataset.rename)]));};
+  const render=()=>{const q=root.querySelector('input[type=search]').value.trim().toLowerCase();const visible=rows.filter(x=>filename(x.name).toLowerCase().includes(q));files.innerHTML=`<table><thead><tr><th>ชื่อไฟล์</th><th>วันที่อัปโหลด</th><th>ขนาด</th><th>จัดการไฟล์</th></tr></thead><tbody>${visible.map((x,i)=>`<tr><td>${esc(filename(x.name))}</td><td>${esc(new Date(x.created_at).toLocaleDateString('th-TH'))}</td><td>${(Number(x.metadata?.size||0)/1024/1024).toFixed(2)} MB</td><td><button type="button" class="ghost" data-download="${i}">ดาวน์โหลด</button> <button type="button" class="ghost" data-rename="${i}">เปลี่ยนชื่อ</button> <button type="button" class="ghost" style="color:#b42332" data-delete="${i}">ลบ</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีไฟล์ที่ตรงกับรายการนี้</td></tr>'}</tbody></table>`;files.querySelectorAll('[data-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await download(visible[Number(b.dataset.download)]);}catch(e){notice.textContent=e.message;}finally{b.disabled=false;}});files.querySelectorAll('[data-rename]').forEach(b=>b.onclick=()=>renameDialog(visible[Number(b.dataset.rename)]));files.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>deleteDialog(visible[Number(b.dataset.delete)]));};
   const refresh=async()=>{files.textContent='กำลังโหลดไฟล์…';try{rows=(await Promise.all(Object.keys(types).map(t=>list(request,org,t)))).flat().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));render();for(const t of ['logo','signature']){const box=root.querySelector(`[data-${t}-preview]`),item=rows.find(x=>x.type===t);box.replaceChildren();if(!item){box.textContent=t==='logo'?'ยังไม่มีโลโก้ที่อัปโหลด':'ยังไม่มีลายเซ็น';continue;}try{const blob=await request(`/storage/v1/object/authenticated/${bucket}/${item.path}`,{responseType:'blob'});const url=URL.createObjectURL(blob);urls.push(url);const img=document.createElement('img');img.src=url;img.alt=types[t];box.append(img);}catch{box.textContent='โหลดตัวอย่างไม่สำเร็จ กรุณาดาวน์โหลดจากรายการ';}}}catch(e){files.textContent=`โหลดไฟล์ไม่สำเร็จ: ${e.message} กดรีเฟรชเพื่อลองใหม่`;throw e;}};
   root.querySelector('input[type=search]').oninput=render;
   root.querySelector('[data-refresh]').onclick=()=>refresh().catch(e=>notice.textContent=e.message);
@@ -59,5 +87,5 @@
   });
   await refresh().catch(e=>notice.textContent=e.message);
  };
- window.CompanyProfile={mount,validate,filename,hex,list,renameTarget};
+ window.CompanyProfile={mount,validate,filename,hex,list,renameTarget,deleteFile};
 })();
