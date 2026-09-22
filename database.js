@@ -1,4 +1,13 @@
 (() => {
+  pageMeta['company-profile']=['คลังข้อมูล','ข้อมูลบริษัท'];
+  const companyPage=document.createElement('section');companyPage.id='company-profile';companyPage.className='page';
+  companyPage.innerHTML='<article class="panel settings-card"><h3>ข้อมูลบริษัท</h3><p>เข้าสู่ระบบเพื่อดูและแก้ไขชื่อบริษัท เลขประจำตัวผู้เสียภาษี ที่อยู่ และอัตรา VAT ที่ใช้ในเอกสาร</p><button class="primary" type="button" data-company-login>เข้าสู่ระบบ</button></article>';
+  document.querySelector('#settings').before(companyPage);
+  companyPage.querySelector('[data-company-login]').onclick=()=>login();
+  document.querySelector('#settings').innerHTML='<article class="panel settings-card"><h3>ตั้งค่า</h3><p>ตรวจสถานะการเชื่อมต่อหรือเข้าสู่ระบบได้จากปุ่มด้านบน</p><div class="setting-row"><div><b>ข้อมูลบริษัท</b><small>จัดการข้อมูลที่ใช้บนหัวเอกสาร</small></div><button class="text-button" type="button" data-open-company>เปิดข้อมูลบริษัท</button></div></article>';
+  const openCompany=()=>{go('company-profile');history.replaceState(null,'','#company-profile');};
+  document.querySelector('[data-page="company-profile"]').onclick=openCompany;
+  document.querySelector('[data-open-company]').onclick=openCompany;
   pageMeta['tax-invoices'] = ['งานขาย', 'ใบกำกับภาษี'];
   const taxPage = document.createElement('section');
   taxPage.id = 'tax-invoices'; taxPage.className = 'page';
@@ -53,7 +62,7 @@
     const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,vat_rate&limit=1`))[0];
     if (!organization) return;
     companyVatRate=Number(organization.vat_rate ?? 7);
-    const settings = document.querySelector('#settings');
+    const settings = document.querySelector('#company-profile');
     settings.innerHTML = `<article class="panel settings-card"><h3>ข้อมูลบริษัท</h3><p>ข้อมูลนี้จะแสดงบนใบเสนอราคา ใบวางบิล และใบกำกับภาษี</p><form id="company-profile-form"><label class="field"><span>ชื่อบริษัท</span><input name="name" required value="${organization.name || ''}"></label><label class="field"><span>เลขประจำตัวผู้เสียภาษี</span><input name="taxId" value="${organization.tax_id || ''}" placeholder="13 หลัก"></label><label class="field"><span>ที่อยู่บริษัท</span><textarea name="address" rows="3" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">${organization.address || ''}</textarea></label><label class="field"><span>อัตรา VAT (%)</span><input name="vatRate" type="number" min="0" max="100" step="0.01" value="${organization.vat_rate ?? 7}"></label><div class="form-actions"><button class="primary" type="submit">บันทึกข้อมูลบริษัท</button></div></form></article>`;
     settings.querySelector('#company-profile-form').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -444,5 +453,5 @@
     }catch(error){alert(error.message);}finally{openingDelivery.delete(id);addPrintButtons();}
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
-  if (['#quotations', '#settings', '#tax-invoices', '#tax-invoice-control', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if (['#quotations', '#settings', '#company-profile', '#tax-invoices', '#tax-invoice-control', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();
