@@ -20,11 +20,12 @@
   let orgId = localStorage.getItem('flowbill-org-id');
   let quotationTaxInvoices = new Map();
   let quotationDeliveryNotes = new Map();
+  let companyVatRate = 7;
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
     const response = await fetch(config.url + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
     const body = await response.text();
-    if (!response.ok) { const detail = JSON.parse(body || '{}'); throw new Error(detail.message || detail.hint || 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ'); }
+    if (!response.ok) { const detail = JSON.parse(body || '{}'); const error=new Error(detail.message || detail.hint || 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ'); error.code=detail.code; error.status=response.status; throw error; }
     return body ? JSON.parse(body) : null;
   };
   const button = document.createElement('button'); button.className = 'ghost'; document.querySelector('.header-actions').prepend(button);
@@ -48,6 +49,7 @@
   const syncCompanyProfile = async () => {
     const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,vat_rate&limit=1`))[0];
     if (!organization) return;
+    companyVatRate=Number(organization.vat_rate ?? 7);
     const settings = document.querySelector('#settings');
     settings.innerHTML = `<article class="panel settings-card"><h3>ข้อมูลบริษัท</h3><p>ข้อมูลนี้จะแสดงบนใบเสนอราคา ใบวางบิล และใบกำกับภาษี</p><form id="company-profile-form"><label class="field"><span>ชื่อบริษัท</span><input name="name" required value="${organization.name || ''}"></label><label class="field"><span>เลขประจำตัวผู้เสียภาษี</span><input name="taxId" value="${organization.tax_id || ''}" placeholder="13 หลัก"></label><label class="field"><span>ที่อยู่บริษัท</span><textarea name="address" rows="3" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">${organization.address || ''}</textarea></label><label class="field"><span>อัตรา VAT (%)</span><input name="vatRate" type="number" min="0" max="100" step="0.01" value="${organization.vat_rate ?? 7}"></label><div class="form-actions"><button class="primary" type="submit">บันทึกข้อมูลบริษัท</button></div></form></article>`;
     settings.querySelector('#company-profile-form').addEventListener('submit', async (event) => {
@@ -92,9 +94,23 @@
         row.append(cell);
       }
     });
-    const billingLink = document.createElement('button'); billingLink.className = 'ghost';
-    billingLink.textContent = 'ไปใบเสนอราคาที่อนุมัติแล้ว'; billingLink.onclick = () => go('quotations');
-    taxPanel.querySelector('.panel-title').append(billingLink);
+    const createButton = document.createElement('button'); createButton.type='button'; createButton.className='primary';
+    createButton.textContent='+ สร้างใบกำกับภาษี';
+    createButton.onclick=async()=>{
+      if(!session||!orgId)return login();
+      createButton.disabled=true;
+      try{
+        await syncAll();
+        window.TaxInvoiceCreate.open({request,org:orgId,user:session.user.id,customers:state.customers,products:state.products,
+          quotes:state.quotations,links:quotationTaxInvoices,vatRate:companyVatRate,
+          onSaved:async result=>{
+            try{await syncAll();window.TaxPaymentFilters.showAll();go('tax-invoices');}
+            catch{alert(`บันทึก ${result.document_number} แล้ว แต่โหลดรายการไม่สำเร็จ กรุณารีเฟรช ไม่ต้องสร้างใหม่`);return;}
+            alert(`${result.created?'สร้างใบกำกับภาษีแล้ว':'พบใบกำกับภาษีเดิม ไม่ได้สร้างซ้ำ'}: ${result.document_number}`);
+          }});
+      }catch(error){alert(error.message);}finally{createButton.disabled=false;}
+    };
+    taxPanel.querySelector('.panel-title').append(createButton);
     window.TaxPaymentFilters.mount(taxPanel,orgId);
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {

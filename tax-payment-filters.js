@@ -35,7 +35,7 @@
       if(notice.textContent!==caption)notice.textContent=caption;
     };
     choices.forEach(({key,button})=>button.addEventListener('click',()=>{active=key;apply();}));
-    controller={apply};apply();return controller;
+    controller={apply,showAll:()=>{active='all';apply();}};apply();return controller;
   };
-  window.TaxPaymentFilters={select,mount,refresh:()=>controller?.apply(true)};
+  window.TaxPaymentFilters={select,mount,refresh:()=>controller?.apply(true),showAll:()=>controller?.showAll()};
 })();
