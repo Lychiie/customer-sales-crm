@@ -35,7 +35,9 @@
   let companyVatRate = 7;
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
-    const response = await fetch(config.url + path, { ...options, headers: { ...headers(), ...(options.headers || {}) } });
+    const {responseType,...fetchOptions}=options;
+    const response = await fetch(config.url + path, { ...fetchOptions, headers: { ...headers(), ...(options.headers || {}) } });
+    if(response.ok&&responseType==='blob')return response.blob();
     const body = await response.text();
     if (!response.ok) { const detail = JSON.parse(body || '{}'); const error=new Error(detail.message || detail.hint || 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ'); error.code=detail.code; error.status=response.status; throw error; }
     return body ? JSON.parse(body) : null;
@@ -63,17 +65,7 @@
     if (!organization) return;
     companyVatRate=Number(organization.vat_rate ?? 7);
     const settings = document.querySelector('#company-profile');
-    settings.innerHTML = `<article class="panel settings-card"><h3>ข้อมูลบริษัท</h3><p>ข้อมูลนี้จะแสดงบนใบเสนอราคา ใบวางบิล และใบกำกับภาษี</p><form id="company-profile-form"><label class="field"><span>ชื่อบริษัท</span><input name="name" required value="${organization.name || ''}"></label><label class="field"><span>เลขประจำตัวผู้เสียภาษี</span><input name="taxId" value="${organization.tax_id || ''}" placeholder="13 หลัก"></label><label class="field"><span>ที่อยู่บริษัท</span><textarea name="address" rows="3" placeholder="เลขที่ ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด รหัสไปรษณีย์">${organization.address || ''}</textarea></label><label class="field"><span>อัตรา VAT (%)</span><input name="vatRate" type="number" min="0" max="100" step="0.01" value="${organization.vat_rate ?? 7}"></label><div class="form-actions"><button class="primary" type="submit">บันทึกข้อมูลบริษัท</button></div></form></article>`;
-    settings.querySelector('#company-profile-form').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const data = Object.fromEntries(new FormData(event.currentTarget));
-      try {
-        const saved = await request(`/rest/v1/organizations?id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name: data.name.trim(), tax_id: data.taxId.trim() || null, address: data.address.trim() || null, vat_rate: Number(data.vatRate) || 0 }) });
-        if (!Array.isArray(saved) || saved.length !== 1) throw new Error('ยังไม่ได้บันทึก: บัญชีนี้ไม่มีสิทธิ์แก้ข้อมูลบริษัท กรุณาใช้บัญชีผู้ดูแล');
-        await syncCompanyProfile();
-        alert('บันทึกข้อมูลบริษัทแล้ว');
-      } catch (error) { alert(error.message); }
-    });
+    await window.CompanyProfile.mount(settings,{request,org:orgId,user:session.user.id,organization,onSaved:saved=>{companyVatRate=Number(saved.vat_rate??7);}});
   };
   const syncQuotations = async () => {
     const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.quotation&select=id,document_number,customer_name_snapshot,issue_date,valid_until,grand_total,status&order=created_at.desc`);
