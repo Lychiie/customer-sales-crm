@@ -199,7 +199,7 @@
     if (items.length) await request('/rest/v1/document_items', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ ...item, document_id: invoices[0].id }))) });
     await request(`/rest/v1/documents?id=eq.${billingId}&organization_id=eq.${orgId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'paid' }) });
     await syncAll();
-    alert(`ออกใบกำกับภาษี ${number} เรียบร้อย`);
+    alert(`ออกใบกำกับภาษี ${invoices[0].document_number} เรียบร้อย`);
   };
   document.addEventListener('click', async (event) => {
     const action = event.target.closest('[data-approve],[data-billing],[data-tax-invoice]'); if (!action || !session || !orgId) return;
@@ -398,7 +398,7 @@
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(?:(?:QT|BL|TI)-|QT\d{2}-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
+      if (!/^(?:(?:QT|BL|TI)-|QT\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';
