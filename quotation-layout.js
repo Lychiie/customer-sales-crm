@@ -35,6 +35,8 @@
     const cashBilling=billing&&/^(?:(?:เครดิต\s*)?[0๐]+\s*(?:วัน)?|เงินสด|ชำระทันที)?$/.test(String(details.paymentTerms||'').trim());
     if(cashBilling)details.paymentTerms='เงินสด';
     const billDue=billing?billingDueDate(doc.issue_date,details.paymentTerms):null;
+    const invoiceDates=[...new Set(items.map(item=>item.issue_date).filter(Boolean))];
+    const cashDue=items.length&&items.every(item=>item.issue_date)&&invoiceDates.length===1?date(invoiceDates[0]):items.length?'ตามวันที่ใบกำกับภาษีแต่ละใบ':'-';
     const pages=[];let page,y,tableTop;
     const text=(s,x,y,size=19,bold=false,align='left',color=INK)=>page.push({type:'text',s:String(s??''),x,y,size,bold,align,color});
     const rect=(x,y,w,h,fill='#ffffff',stroke=LINE)=>page.push({type:'rect',x,y,w,h,fill,stroke});
@@ -63,11 +65,12 @@
         leftY+=block('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),L,leftY,630,15,false,MUTED);
         text('รายละเอียดการวางบิล',805,customerY,14,true,'left',MUTED);
         let rightY=customerY+30;
-        for(const [label,value] of [['เอกสาร',items.length+' ใบกำกับภาษี'],['เครดิต',details.paymentTerms||'-'],['กำหนดชำระ',cashBilling?'เงินสด':billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
-          text(label,805,rightY,15,false,'left',MUTED);
+        for(const [label,value] of [['เอกสาร',items.length+' ใบกำกับภาษี'],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดชำระ',cashBilling?cashDue:billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
+          const labelLines=wrap(label,102,15,false,measure);
+          labelLines.forEach((s,i)=>text(s,805,rightY+i*26,15,false,'left',MUTED));
           const lines=wrap(value,242,17,false,measure);
           lines.forEach((s,i)=>text(s,915,rightY+i*26,17));
-          rightY+=Math.max(1,lines.length)*26+10;
+          rightY+=Math.max(1,lines.length,labelLines.length)*26+10;
         }
         y=Math.max(leftY,rightY)+36;
         if(y>950)throw Error('ข้อมูลหัวใบวางบิลยาวเกินพื้นที่ กรุณาตรวจข้อมูลก่อนพิมพ์');
