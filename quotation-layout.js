@@ -18,7 +18,7 @@
   const billingDueDate=(issue,terms)=>{
     const normalized=String(terms??'').trim().replace(/[๐-๙]/g,c=>String('๐๑๒๓๔๕๖๗๘๙'.indexOf(c)));
     const match=normalized.match(/^(?:เครดิต\s*)?(\d+)\s*(?:วัน)?$/);
-    const days=/^(เงินสด|ชำระทันที)$/.test(normalized)?0:match?Number(match[1]):null;
+    const days=/^(เงินสด|ชำระทันที)?$/.test(normalized)?0:match?Number(match[1]):null;
     if(days===null||!Number.isSafeInteger(days)||days>3650||!/^\d{4}-\d{2}-\d{2}$/.test(issue||''))return null;
     const value=new Date(issue+'T00:00:00Z');
     if(!Number.isFinite(value.getTime())||value.toISOString().slice(0,10)!==issue)return null;
@@ -32,6 +32,8 @@
     if(billing&&items.some(item=>item.kind!=='tax_invoice'||!item.document_number||item.grand_total==null||!Number.isFinite(Number(item.grand_total))||Number(item.grand_total)<0))throw Error('รายการใบวางบิลต้องเชื่อมกับใบกำกับภาษีที่ออกแล้ว');
     const billingTotal=billing?items.reduce((sum,item)=>sum+Math.round(Number(item.grand_total)*100),0)/100:0;
     const details=window.QuotationEditor?.decode(doc.notes)||{paymentTerms:'',deliveryTerms:'',notes:doc.notes||'',rates:[]};
+    const cashBilling=billing&&/^(?:(?:เครดิต\s*)?[0๐]+\s*(?:วัน)?|เงินสด|ชำระทันที)?$/.test(String(details.paymentTerms||'').trim());
+    if(cashBilling)details.paymentTerms='เงินสด';
     const billDue=billing?billingDueDate(doc.issue_date,details.paymentTerms):null;
     const pages=[];let page,y,tableTop;
     const text=(s,x,y,size=19,bold=false,align='left',color=INK)=>page.push({type:'text',s:String(s??''),x,y,size,bold,align,color});
@@ -61,7 +63,7 @@
         leftY+=block('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),L,leftY,630,15,false,MUTED);
         text('รายละเอียดการวางบิล',805,customerY,14,true,'left',MUTED);
         let rightY=customerY+30;
-        for(const [label,value] of [['เอกสาร',items.length+' ใบกำกับภาษี'],['เครดิต',details.paymentTerms||'-'],['กำหนดชำระ',billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
+        for(const [label,value] of [['เอกสาร',items.length+' ใบกำกับภาษี'],['เครดิต',details.paymentTerms||'-'],['กำหนดชำระ',cashBilling?'เงินสด':billDue?date(billDue):'ยังไม่ระบุเครดิต / วันที่บิล']]){
           text(label,805,rightY,15,false,'left',MUTED);
           const lines=wrap(value,242,17,false,measure);
           lines.forEach((s,i)=>text(s,915,rightY+i*26,17));
