@@ -4,6 +4,9 @@
   taxPage.id = 'tax-invoices'; taxPage.className = 'page';
   taxPage.innerHTML = '<article class="panel settings-card"><h3>ใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูรายการใบกำกับภาษี</p></article>';
   document.querySelector('#invoices').after(taxPage);
+  pageMeta['tax-invoice-control']=['งานขาย','ศูนย์ควบคุมใบกำกับภาษี'];
+  const taxControlPage=document.createElement('section');taxControlPage.id='tax-invoice-control';taxControlPage.className='page';
+  taxControlPage.innerHTML='<article class="panel settings-card"><h3>ศูนย์ควบคุมใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูเอกสารทั้งหมด</p></article>';taxPage.after(taxControlPage);
   for (const [id, title, description] of [
     ['delivery-notes', 'ใบส่งสินค้า', 'เอกสารสำหรับแสดงรายการสินค้าและการรับมอบสินค้า'],
     ['cash-bills', 'บิลเงินสด', 'เอกสารสำหรับรายการขายที่รับชำระเงินทันที']
@@ -110,7 +113,10 @@
           }});
       }catch(error){alert(error.message);}finally{createButton.disabled=false;}
     };
-    taxPanel.querySelector('.panel-title').append(createButton);
+    const controlButton=document.createElement('button');controlButton.type='button';controlButton.className='ghost';controlButton.textContent='รวมข้อมูลใบกำกับภาษี';
+    controlButton.onclick=async()=>{if(!session||!orgId)return login();await window.TaxInvoiceControl.open(request,orgId);};
+    const taxActions=document.createElement('div');taxActions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';taxActions.append(controlButton,createButton);
+    taxPanel.querySelector('.panel-title').append(taxActions);
     window.TaxPaymentFilters.mount(taxPanel,orgId);
   };
   const renderDocumentActions = () => document.querySelectorAll('#quotation-body tr').forEach((row) => {
@@ -128,6 +134,7 @@
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
     });
     separateTaxInvoices(); render(); renderDocumentActions();
+    await window.TaxInvoiceControl.configure(request,orgId);
     await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]);
   };
   const login = () => { document.querySelector('#modal-content').innerHTML = '<div class="form-content"><h2>เข้าสู่ระบบ CRM</h2><label class="field"><span>อีเมล</span><input name="email" type="email" required></label><label class="field"><span>รหัสผ่าน</span><input name="password" type="password" required></label><p id="loginError" style="color:#c43d50"></p><div class="form-actions"><button value="cancel" class="ghost">ยกเลิก</button><button class="primary" value="login">เข้าสู่ระบบ</button></div></div>'; modal.dataset.type = 'login'; modal.showModal(); };
@@ -358,7 +365,7 @@
     preview.querySelector('[data-print-now]').onclick = () => { document.title = doc.document_number; window.print(); };
     preview.querySelector('[data-print-now]').focus();
   };
-  window.DocumentPayment.bind(request, () => orgId, () => Boolean(session), login, () => window.TaxPaymentFilters.refresh());
+  window.DocumentPayment.bind(request, () => orgId, () => Boolean(session), login, () => {window.TaxPaymentFilters.refresh();window.TaxInvoiceControl.invalidate();});
   const openingDelivery = new Set();
   const addPrintButtons = () => {
     document.querySelectorAll('#quotation-body tr').forEach(row=>{
@@ -436,5 +443,5 @@
     }catch(error){alert(error.message);}finally{openingDelivery.delete(id);addPrintButtons();}
   });
   if (session) syncAll().catch(() => { session = null; localStorage.removeItem('flowbill-session'); label(); });
-  if (['#quotations', '#settings', '#tax-invoices', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if (['#quotations', '#settings', '#tax-invoices', '#tax-invoice-control', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();
