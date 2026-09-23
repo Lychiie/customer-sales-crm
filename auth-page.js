@@ -1,5 +1,5 @@
 (() => {
-  const pages=new Set(['dashboard','quotations','invoices','tax-invoices','tax-invoice-control','delivery-notes','cash-bills','company-profile','customers','products','purchase-tax','sales-tax','settings']);
+  const pages=new Set(['dashboard','quotations','invoices','tax-invoices','tax-invoice-control','delivery-notes','cash-bills','company-profile','customers','products','purchase-tax','sales-tax','settings','members']);
   const safePage=value=>pages.has(value)?value:'dashboard';
   const loginUrl=()=>new URL('login.html?next='+encodeURIComponent(safePage(location.hash.slice(1))),location.href).href;
   window.CRMAuth={safePage,login:()=>location.assign(loginUrl())};
@@ -17,9 +17,10 @@
       submit.disabled=true;submit.textContent='กำลังเข้าสู่ระบบ…';error.textContent='';
       try{
         const config=window.SUPABASE_CONFIG;if(!config?.url||!config?.publishableKey)throw Error('ไม่พบการตั้งค่าการเชื่อมต่อ กรุณาติดต่อผู้ดูแล');
-        const response=await fetch(config.url+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({email:form.elements.email.value.trim(),password:password.value})});
+        const email=window.MemberIdentity.email(form.elements.email.value);
+        const response=await fetch(config.url+'/auth/v1/token?grant_type=password',{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({email,password:password.value})});
         const session=await response.json();
-        if(!response.ok||!session.access_token||!session.user?.id)throw Error(response.status===429?'ลองเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่':'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือบัญชียังไม่พร้อมใช้งาน');
+        if(!response.ok||!session.access_token||!session.user?.id)throw Error(response.status===429?'ลองเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่':'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง หรือบัญชียังไม่พร้อมใช้งาน');
         const membership=await fetch(config.url+'/rest/v1/organization_members?user_id=eq.'+encodeURIComponent(session.user.id)+'&select=organization_id&limit=1',{headers:{apikey:config.publishableKey,Authorization:'Bearer '+session.access_token}});
         if(!membership.ok)throw Error('ตรวจสิทธิ์องค์กรไม่สำเร็จ กรุณาลองใหม่');
         const rows=await membership.json();if(!rows[0]?.organization_id)throw Error('บัญชีนี้ยังไม่มีสิทธิ์เข้าองค์กร กรุณาติดต่อผู้ดูแล');

@@ -5,13 +5,14 @@
   <title>เข้าสู่ระบบ — บุญยก ซัพพลาย</title>
   <link rel="stylesheet" href="login.css?v=1">
   <script src="supabase-config.js"></script>
-  <script src="auth-page.js?v=1"></script>
+  <script src="member-identity.js?v=1"></script>
+  <script src="auth-page.js?v=members-1"></script>
 </head>
 <body>
   <main class="login-shell">
     <section class="welcome"><span class="eyebrow">BOONYOK SUPPLY</span><h1>งานขายทุกขั้นตอน<br>จัดการได้ในที่เดียว</h1><p>ข้อมูลลูกค้า สินค้า และเอกสารงานขาย<br>สำหรับทีมบริษัท บุญยก ซัพพลาย จำกัด</p><div class="document-list"><span>ใบเสนอราคา</span><span>ใบส่งสินค้า</span><span>ใบกำกับภาษี</span><span>ใบวางบิล</span></div><small>ระบบสำหรับผู้ใช้งานที่ได้รับสิทธิ์จากบริษัท</small></section>
     <section class="login-card"><div class="brand">BY <span>บุญยก ซัพพลาย<small>ระบบจัดการงานขาย</small></span></div><h2>ยินดีต้อนรับกลับ</h2><p class="intro">เข้าสู่ระบบด้วยบัญชีของคุณ</p>
-      <form><label>อีเมล<input name="email" type="email" autocomplete="username" placeholder="name@company.com" required autofocus></label><label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required></label><button type="button" class="show" data-show-password aria-pressed="false">แสดงรหัสผ่าน</button><p role="alert" aria-live="polite"></p><button type="submit" class="submit">เข้าสู่ระบบ</button></form>
+      <form><label>ชื่อผู้ใช้ (User)<input name="email" type="text" autocomplete="username" placeholder="ชื่อผู้ใช้ หรืออีเมลบัญชีเดิม" required autofocus autocapitalize="none" spellcheck="false"></label><label>รหัสผ่าน (Password)<input name="password" type="password" autocomplete="current-password" required></label><button type="button" class="show" data-show-password aria-pressed="false">แสดงรหัสผ่าน</button><p role="alert" aria-live="polite"></p><button type="submit" class="submit">เข้าสู่ระบบ</button></form>
       <p class="help">หากลืมรหัสผ่านหรือยังไม่มีบัญชี<br>กรุณาติดต่อผู้ดูแลระบบของบริษัท</p>
     </section>
   </main>

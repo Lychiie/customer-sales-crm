@@ -129,6 +129,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>à
   });
   const syncAll = async () => {
     await loadOrganization();
+    await window.Members.configure(request,orgId,session.user.id);
     await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
       window.QuotationDelivery.loadLinked(request, orgId).then(links => { quotationDeliveryNotes = links; })]);
     state.quotations.forEach(quote => {
