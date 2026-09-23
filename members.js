@@ -1,5 +1,7 @@
 (() => {
   let root,nav,context,version=0;
+  const roles={sales:'พนักงานขาย',finance:'พนักงานบัญชี / การเงิน',admin:'ผู้ดูแล'};
+  const roleOptions=()=>Object.entries(roles).map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
   const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const invoke=(request,org,data)=>request('/functions/v1/admin-members',{method:'POST',body:JSON.stringify({...data,organization_id:org})});
   const load=async()=>{
@@ -8,14 +10,39 @@
     try{
       const data=await invoke(request,org,{action:'list'});if(current!==version)return;
       root.innerHTML='<div class="page-toolbar"><div><h2>สมาชิก</h2><p>เฉพาะผู้ดูแลเท่านั้นที่สร้างสมาชิกได้</p></div><button class="primary" data-add>+ สร้างสมาชิก</button></div><article class="panel table-panel"><table><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อสมาชิก</th><th>วันที่สร้าง</th></tr></thead><tbody>'+data.members.map(m=>`<tr><td>${escape(m.username)}</td><td>${escape(m.display_name)}</td><td>${escape(new Date(m.created_at).toLocaleDateString('th-TH'))}</td></tr>`).join('')+'</tbody></table><p style="padding:20px">รายการนี้แสดงบัญชีที่สร้างผ่านระบบสมาชิกใหม่ บัญชีอีเมลเดิมยังเข้าใช้งานได้ตามปกติ</p></article>';
+      root.querySelector('thead tr').insertAdjacentHTML('beforeend','<th>สิทธิ์</th><th>จัดการ</th>');
+      root.querySelectorAll('tbody tr').forEach((row,i)=>{
+        const roleCell=document.createElement('td');roleCell.textContent=roles[data.members[i].role]||'ไม่ทราบสิทธิ์';row.append(roleCell);
+        const cell=document.createElement('td'),button=document.createElement('button');button.className='ghost';button.textContent='แก้ไข';button.setAttribute('aria-label','แก้ไขข้อมูลสมาชิก '+data.members[i].display_name);
+        button.onclick=()=>edit(request,org,data.members[i]);cell.append(button);row.append(cell);
+      });
       root.querySelector('[data-add]').onclick=()=>open(request,org);
     }catch(e){if(current!==version)return;root.innerHTML='<article class="panel settings-card"><p role="alert">'+escape(e.message)+'</p><button class="ghost">ลองใหม่</button></article>';root.querySelector('button').onclick=load;}
+  };
+  const edit=(request,org,member)=>{
+    if(document.querySelector('#member-dialog'))return;
+    const d=document.createElement('dialog');d.id='member-dialog';d.style.cssText='width:min(540px,calc(100% - 32px));border:0;border-radius:16px;padding:28px';
+    d.innerHTML='<form><h2>แก้ไขข้อมูลสมาชิก</h2><label class="field">ชื่อผู้ใช้ (User)<input name="username" readonly></label><label class="field">ชื่อสมาชิก<input name="display_name" required maxlength="100" autocomplete="off"></label><p>แก้ไขชื่อสมาชิกได้ โดยไม่เปลี่ยนชื่อผู้ใช้ รหัสผ่าน หรือสิทธิ์การใช้งาน</p><p role="alert"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button class="primary" type="submit">บันทึกการแก้ไข</button></div></form>';
+    const f=d.querySelector('form'),submit=f.querySelector('[type=submit]'),cancel=f.querySelector('[data-cancel]'),error=f.querySelector('[role=alert]');let busy=false;
+    f.elements.username.value=member.username;f.elements.display_name.value=member.display_name;
+    f.querySelector('p').textContent='เลือกสิทธิ์ให้ตรงกับหน้าที่ ผู้ดูแลสามารถจัดการสมาชิกและเข้าถึงไฟล์บริษัทได้ การแก้ไขนี้ไม่เปลี่ยนชื่อผู้ใช้หรือรหัสผ่าน';
+    f.querySelector('p').insertAdjacentHTML('beforebegin','<label class="field">สิทธิ์การใช้งาน<select name="role" required><option value="">เลือกสิทธิ์</option>'+roleOptions()+'</select></label>');
+    f.elements.role.value=member.role||'';
+    const close=()=>{d.close();d.remove();};cancel.onclick=close;d.oncancel=e=>{e.preventDefault();if(!busy)close();};
+    f.onsubmit=async e=>{
+      e.preventDefault();if(busy||!f.reportValidity())return;
+      const name=f.elements.display_name.value.trim();if(!name){error.textContent='กรุณาระบุชื่อสมาชิก';return;}
+      busy=true;submit.disabled=cancel.disabled=true;error.textContent='';
+      try{await invoke(request,org,{action:'update',user_id:member.user_id,display_name:name,role:f.elements.role.value});close();await configure(request,org,context.user);if(context)await load();}
+      catch(e){error.textContent=e.message;}finally{busy=false;submit.disabled=cancel.disabled=false;}
+    };document.body.append(d);d.showModal();f.elements.display_name.focus();
   };
   const open=(request,org)=>{
     if(document.querySelector('#member-dialog'))return;
     const d=document.createElement('dialog');d.id='member-dialog';d.style.cssText='width:min(540px,calc(100% - 32px));border:0;border-radius:16px;padding:28px';
 d.innerHTML='<form><h2>สร้างสมาชิก</h2><label class="field">ชื่อสมาชิก<input name="display_name" required maxlength="100" autocomplete="off"></label><label class="field">ชื่อผู้ใช้ (User)<input name="username" required minlength="3" maxlength="32" pattern="[a-zA-Z][a-zA-Z0-9._\\-]{2,31}" autocomplete="off"></label><p>ใช้ภาษาอังกฤษ ตัวเลข จุด ขีด หรือขีดล่าง 3–32 ตัว ขึ้นต้นด้วยตัวอักษร</p><label class="field">รหัสผ่าน (Password)<input name="password" type="password" required minlength="6" maxlength="128" autocomplete="new-password"></label><label class="field">ยืนยันรหัสผ่าน<input name="confirm" type="password" required autocomplete="new-password"></label><label class="field">สิทธิ์<select name="role"><option value="sales">สมาชิกงานขาย</option><option value="admin">ผู้ดูแล — สร้างสมาชิกและเข้าถึงไฟล์บริษัทได้</option></select></label><p>รหัสผ่านอย่างน้อย 6 ตัวอักษร ระบบไม่แสดงรหัสผ่านย้อนหลัง</p><p role="alert"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button class="primary" type="submit">สร้างสมาชิก</button></div></form>';
     const f=d.querySelector('form'),submit=f.querySelector('[type=submit]'),cancel=f.querySelector('[data-cancel]'),error=f.querySelector('[role=alert]');let busy=false;
+    f.elements.role.innerHTML=roleOptions();
     const close=()=>{f.reset();d.close();d.remove();};cancel.onclick=close;d.oncancel=e=>{e.preventDefault();if(!busy)close();};
     f.onsubmit=async e=>{
       e.preventDefault();if(busy||!f.reportValidity())return;error.textContent='';
@@ -34,7 +61,7 @@ d.innerHTML='<form><h2>สร้างสมาชิก</h2><label class="field
       nav.onclick=()=>{window.go('members');history.replaceState(null,'','#members');load();};
     }
     const rows=await request('/rest/v1/organization_members?organization_id=eq.'+encodeURIComponent(org)+'&user_id=eq.'+encodeURIComponent(user)+'&select=role&limit=1');
-    const allowed=rows[0]?.role==='admin';nav.hidden=!allowed;nav.style.display=allowed?'':'none';context=allowed?{request,org}:null;
+    const allowed=rows[0]?.role==='admin';nav.hidden=!allowed;nav.style.display=allowed?'':'none';context=allowed?{request,org,user}:null;
     if(!allowed){version++;root.innerHTML='<article class="panel settings-card"><p>เฉพาะผู้ดูแลเท่านั้นที่เข้าถึงสมาชิกได้</p></article>';}
     if(location.hash==='#members'){window.go('members');if(allowed)await load();}
   };
