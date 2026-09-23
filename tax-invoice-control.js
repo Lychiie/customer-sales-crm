@@ -53,7 +53,7 @@
         root.querySelector('tbody').innerHTML=rows.length?rows.map((d,i)=>`<tr><td>${pageIndex*pageSize+i+1}</td><td><button type="button" class="text-button tic-number" data-print-document="${escape(d.document_number)}" aria-label="เปิดใบกำกับภาษี ${escape(d.document_number)}">${escape(d.document_number)}</button></td><td>${escape(date(d.issue_date))}</td><td>${escape(d.customer_name_snapshot)}<small>${escape(d.customer_tax_id_snapshot||'')}</small></td><td>${escape(date(d.due_date||d.issue_date))}</td><td class="tic-right">${money(d.grand_total)}</td><td>${labels[category(d)]}</td><td><button type="button" class="ghost" data-print-document="${escape(d.document_number)}">ดู / พิมพ์ PDF</button></td></tr>`).join(''):'<tr><td colspan="8" style="text-align:center;padding:32px">ไม่พบเอกสารตามตัวกรองนี้</td></tr>';
         root.querySelectorAll('tbody tr').forEach(row=>{if(row.children.length>1)row.lastElementChild.replaceChildren();else row.firstElementChild.colSpan=8;});
         window.TaxInvoiceDelete.mount(root,rows,request,org,context.onDeleted||load,{trash:filters.tab==='trash'});
-        window.BillingCreate.mount(root,rows,request,org,context.onDeleted||load);
+        if(filters.tab!=='trash')window.BillingCreate.mount(root,rows,request,org,context.onDeleted||load);
         root.querySelector('[data-summary]').textContent=`${labels[filters.tab]} · ${result.rows.length} ใบที่ตรงตัวกรอง จากเอกสารทั้งหมด ${documents.length} ใบ`;
         root.querySelector('[data-paging]').textContent=`หน้า ${pageIndex+1} / ${pages} · แสดง ${rows.length} ใบต่อหน้านี้`;
         root.querySelector('[data-prev]').disabled=pageIndex===0;root.querySelector('[data-next]').disabled=pageIndex>=pages-1;
