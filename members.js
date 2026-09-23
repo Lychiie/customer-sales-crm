@@ -28,13 +28,43 @@
     f.querySelector('p').textContent='เลือกสิทธิ์ให้ตรงกับหน้าที่ ผู้ดูแลสามารถจัดการสมาชิกและเข้าถึงไฟล์บริษัทได้ การแก้ไขนี้ไม่เปลี่ยนชื่อผู้ใช้หรือรหัสผ่าน';
     f.querySelector('p').insertAdjacentHTML('beforebegin','<label class="field">สิทธิ์การใช้งาน<select name="role" required><option value="">เลือกสิทธิ์</option>'+roleOptions()+'</select></label>');
     f.elements.role.value=member.role||'';
+    f.elements.username.readOnly=false;
+    f.elements.username.maxLength=32;
+    f.elements.username.insertAdjacentHTML('afterend','<button type="button" class="ghost" data-save-user>บันทึกชื่อผู้ใช้</button>');
+    f.querySelector('p').textContent='บันทึกชื่อผู้ใช้และตั้งรหัสผ่านด้วยปุ่มแยกด้านล่าง ส่วนปุ่มบันทึกข้อมูลใช้สำหรับชื่อสมาชิกและสิทธิ์ ผู้ดูแลเข้าถึงการจัดการสมาชิกและไฟล์บริษัทได้';
+    error.insertAdjacentHTML('beforebegin','<details style="margin:16px 0"><summary>ตั้งรหัสผ่านใหม่</summary><label class="field">รหัสผ่านใหม่<input name="new_password" type="password" maxlength="128" autocomplete="new-password"></label><label class="field">ยืนยันรหัสผ่านใหม่<input name="new_confirm" type="password" maxlength="128" autocomplete="new-password"></label><p>อย่างน้อย 6 ตัวอักษร ไม่แสดงรหัสเดิม หากไม่กดตั้งรหัสใหม่จะใช้รหัสเดิม</p><button type="button" class="ghost" data-save-password>ตั้งรหัสผ่านใหม่</button></details><p role="status" data-member-status></p>');
+    submit.textContent='บันทึกชื่อสมาชิกและสิทธิ์';
+    const status=f.querySelector('[data-member-status]');
+    const lock=value=>{busy=value;f.querySelectorAll('button').forEach(b=>b.disabled=value);};
+    const saveLogin=async action=>{
+      if(busy)return;error.textContent='';status.textContent='';
+      const payload={action,user_id:member.user_id};
+      if(action==='username'){
+        payload.username=window.MemberIdentity.username(f.elements.username.value);
+        if(!window.MemberIdentity.valid(payload.username)){error.textContent='ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษ 3–32 ตัวและขึ้นต้นด้วยตัวอักษร';return;}
+      }else{
+        payload.password=f.elements.new_password.value;
+        if(payload.password.length<6||payload.password.length>128){error.textContent='รหัสผ่านต้องมี 6–128 ตัวอักษร';return;}
+        if(payload.password!==f.elements.new_confirm.value){error.textContent='รหัสผ่านสองช่องไม่ตรงกัน';return;}
+      }
+      lock(true);
+      try{
+        await invoke(request,org,payload);
+        if(action==='username'){member.username=payload.username;f.elements.username.value=payload.username;}
+        status.textContent=action==='username'?'บันทึกชื่อผู้ใช้แล้ว ใช้ชื่อใหม่เข้าสู่ระบบครั้งถัดไป':'ตั้งรหัสผ่านใหม่แล้ว';
+        await load();
+      }catch(e){error.textContent=e.message;}
+      finally{delete payload.password;f.elements.new_password.value=f.elements.new_confirm.value='';lock(false);}
+    };
+    f.querySelector('[data-save-user]').onclick=()=>saveLogin('username');
+    f.querySelector('[data-save-password]').onclick=()=>saveLogin('password');
     const close=()=>{d.close();d.remove();};cancel.onclick=close;d.oncancel=e=>{e.preventDefault();if(!busy)close();};
     f.onsubmit=async e=>{
       e.preventDefault();if(busy||!f.reportValidity())return;
       const name=f.elements.display_name.value.trim();if(!name){error.textContent='กรุณาระบุชื่อสมาชิก';return;}
-      busy=true;submit.disabled=cancel.disabled=true;error.textContent='';
+      lock(true);error.textContent='';status.textContent='';
       try{await invoke(request,org,{action:'update',user_id:member.user_id,display_name:name,role:f.elements.role.value});close();await configure(request,org,context.user);if(context)await load();}
-      catch(e){error.textContent=e.message;}finally{busy=false;submit.disabled=cancel.disabled=false;}
+      catch(e){error.textContent=e.message;}finally{lock(false);}
     };document.body.append(d);d.showModal();f.elements.display_name.focus();
   };
   const open=(request,org)=>{
