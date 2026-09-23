@@ -13,7 +13,7 @@
       throw error;
     }finally{pending.delete(doc.id);}
   };
-  const remove=async(request,org,doc)=>{if(doc.payment_received===true)throw Error('ลบไม่ได้: เอกสารนี้ชำระเงินแล้ว');return rpc(request,'delete_tax_invoice',org,doc);};
+  const remove=async(request,org,doc)=>rpc(request,'delete_tax_invoice',org,doc);
   const confirmPurge=(request,org,doc,onDone)=>{if(!window.confirm(`ลบ ${doc.document_number} ออกจากถังขยะถาวรหรือไม่? การลบนี้กู้คืนไม่ได้`))return;rpc(request,'purge_tax_invoice',org,doc).then(onDone).catch(error=>alert(error.message));};
   const mount=(root,rows,request,org,onDeleted,{trash=false}={})=>{
     root.querySelectorAll('tbody tr').forEach((row,index)=>{
@@ -25,7 +25,7 @@
         const purge=document.createElement('button');purge.type='button';purge.className='ghost';purge.textContent='ลบถาวร';purge.style.color='#b42332';purge.onclick=()=>confirmPurge(request,org,doc,onDeleted);actions.append(restore,purge);
       }else{
         const button=document.createElement('button');button.type='button';button.className='ghost';button.textContent='ลบ';button.style.color='#b42332';button.setAttribute('aria-label',`ย้ายใบกำกับภาษี ${doc.document_number} ไปถังขยะ`);
-        button.disabled=doc.payment_received===true;if(button.disabled)button.title='ชำระเงินแล้ว ไม่สามารถลบได้';
+        button.disabled=false;
         button.onclick=async()=>{if(button.disabled)return;button.disabled=true;button.textContent='กำลังย้าย…';try{await remove(request,org,doc);await onDeleted();alert(`ย้ายใบกำกับภาษี ${doc.document_number} ไปถังขยะแล้ว`);}catch(error){button.disabled=false;button.textContent='ลบ';alert(error.message);}};actions.append(button);
       }
       row.lastElementChild.replaceChildren(actions);

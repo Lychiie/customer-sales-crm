@@ -21,14 +21,6 @@ begin
   if target.deleted_at is not null then
     raise exception 'เอกสารนี้อยู่ในถังขยะแล้ว';
   end if;
-  if target.payment_received or exists(select 1 from public.payments where document_id=p_id) then
-    raise exception 'ลบไม่ได้: เอกสารนี้ชำระแล้วหรือมีรายการรับชำระเงิน';
-  end if;
-  -- FOR UPDATE also blocks concurrent FK inserts while dependency checks run.
-  if exists(select 1 from public.documents where source_document_id=p_id)
-    or exists(select 1 from public.documents where id=target.source_document_id and kind='billing_note') then
-    raise exception 'ลบไม่ได้: เอกสารนี้เชื่อมกับใบวางบิลหรือมีเอกสารอื่นอ้างอิง';
-  end if;
   update public.documents set deleted_at=now(), deleted_by=auth.uid(), updated_at=now()
     where id=p_id and organization_id=p_org and kind='tax_invoice' and deleted_at is null;
   return jsonb_build_object('id',p_id,'document_number',target.document_number,'deleted',true,'trashed',true);
