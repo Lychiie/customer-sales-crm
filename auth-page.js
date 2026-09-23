@@ -1,5 +1,5 @@
 (() => {
-  const pages=new Set(['dashboard','quotations','invoices','tax-invoices','tax-invoice-control','delivery-notes','cash-bills','company-profile','customers','products','purchase-tax','sales-tax','settings','members']);
+  const pages=new Set(['dashboard','quotations','invoices','tax-invoices','tax-invoice-control','tax-invoice-trash','delivery-notes','cash-bills','company-profile','customers','products','purchase-tax','sales-tax','settings','members']);
   const safePage=value=>pages.has(value)?value:'dashboard';
   const loginUrl=()=>new URL('login.html?next='+encodeURIComponent(safePage(location.hash.slice(1))),location.href).href;
   window.CRMAuth={safePage,login:()=>location.assign(loginUrl())};

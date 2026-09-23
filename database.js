@@ -16,6 +16,10 @@
   pageMeta['tax-invoice-control']=['งานขาย','ศูนย์ควบคุมใบกำกับภาษี'];
   const taxControlPage=document.createElement('section');taxControlPage.id='tax-invoice-control';taxControlPage.className='page';
   taxControlPage.innerHTML='<article class="panel settings-card"><h3>ศูนย์ควบคุมใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูเอกสารทั้งหมด</p></article>';taxPage.after(taxControlPage);
+  pageMeta['tax-invoice-trash']=['งานขาย','ถังขยะใบกำกับภาษี'];
+  const taxTrashPage=document.createElement('section');taxTrashPage.id='tax-invoice-trash';taxTrashPage.className='page tax-invoice-workspace';
+  taxTrashPage.innerHTML='<article class="panel settings-card"><h3>ถังขยะใบกำกับภาษี</h3><p>เข้าสู่ระบบเพื่อดูเอกสารที่ลบ</p></article>';taxControlPage.after(taxTrashPage);
+  taxControlPage.classList.add('tax-invoice-workspace');
   for (const [id, title, description] of [
     ['delivery-notes', 'ใบส่งสินค้า', 'เอกสารสำหรับแสดงรายการสินค้าและการรับมอบสินค้า'],
     ['cash-bills', 'บิลเงินสด', 'เอกสารสำหรับรายการขายที่รับชำระเงินทันที']
@@ -451,5 +455,5 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     if(error.status===401){session=null;localStorage.removeItem('flowbill-session');localStorage.removeItem('flowbill-org-id');login();}
     else {label();alert('โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชเพื่อลองใหม่');}
   });
-  if (['#quotations', '#settings', '#company-profile', '#tax-invoices', '#tax-invoice-control', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if (['#quotations', '#settings', '#company-profile', '#tax-invoices', '#tax-invoice-control', '#tax-invoice-trash', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
 })();
