@@ -1,4 +1,22 @@
 (() => {
+  const style=document.createElement('style');style.textContent=`
+    #member-dialog{font-family:inherit;color:#24324b;max-height:90vh;overflow:auto;box-shadow:0 20px 70px #14213833}
+    #member-dialog::backdrop{background:#16233855}
+    #member-dialog form{display:grid;gap:16px}
+    #member-dialog h2{margin:0 0 4px;font-size:22px}
+    #member-dialog .field{display:grid;gap:7px;font-size:14px;font-weight:500}
+    #member-dialog input,#member-dialog select{box-sizing:border-box;width:100%;min-width:0;padding:10px 12px;border:1px solid #d7deea;border-radius:8px;font:inherit;background:#fff;color:#24324b}
+    #member-dialog input:focus,#member-dialog select:focus{outline:2px solid #8aafd4;outline-offset:1px}
+    #member-dialog p{margin:0;font-size:13px;line-height:1.7;color:#63728a}
+    #member-dialog p:empty{display:none}
+    #member-dialog [role=alert]{color:#b42318}
+    #member-dialog [role=status]{color:#16734c}
+    #member-dialog details{border:1px solid #e0e5ef;border-radius:10px;padding:14px}
+    #member-dialog details .field,#member-dialog details p,#member-dialog details button{margin-top:12px}
+    #member-dialog summary{cursor:pointer;font-weight:600}
+    #member-dialog .field button{justify-self:start}
+    #member-dialog .form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid #e7ebf2}
+  `;document.head.append(style);
   let root,nav,context,version=0;
   const roles={sales:'พนักงานขาย',finance:'พนักงานบัญชี / การเงิน',admin:'ผู้ดูแล'};
   const roleOptions=()=>Object.entries(roles).map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
