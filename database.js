@@ -74,10 +74,10 @@
     state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, statusCode: quote.status, status: status[quote.status] || quote.status }));
   };
   const syncBillingNotes = async () => {
-    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,payment_received,kind,source_document_id&order=created_at.desc`);
+    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,grand_total,status,payment_received,kind,source_document_id,deleted_at&order=created_at.desc`);
     quotationTaxInvoices = window.QuotationTax.linkedInvoices(documents);
-    const rows = documents.filter((document) => document.kind === 'billing_note');
-    const taxInvoices = documents.filter((document) => document.kind === 'tax_invoice');
+    const rows = documents.filter((document) => document.kind === 'billing_note' && !document.deleted_at);
+    const taxInvoices = documents.filter((document) => document.kind === 'tax_invoice' && !document.deleted_at);
 document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><p>ติ๊กเมื่อชำระเงินแล้ว • ไม่ได้ติ๊ก = ค้างจ่าย • บันทึกแยกแต่ละเอกสาร</p><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะชำระเงิน</th><th></th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${window.DocumentPayment.render(bill)}</td><td></td></tr>`).join('')}</tbody></table></article><article class="panel table-panel" style="margin-top:16px"><div class="panel-title"><div><h3>ใบกำกับภาษี / ใบเสร็จ</h3><p>เอกสารที่ออกหลังได้รับชำระเงิน</p></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะชำระเงิน</th></tr></thead><tbody>${taxInvoices.length ? taxInvoices.map((invoice) => `<tr><td><strong>${invoice.document_number}</strong></td><td>${invoice.customer_name_snapshot}</td><td>฿ ${Number(invoice.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${window.DocumentPayment.render(invoice)}</td></tr>`).join('') : '<tr><td colspan="4">ยังไม่มีใบกำกับภาษี</td></tr>'}</tbody></table></article>`;
   };
   const separateTaxInvoices = () => {
@@ -116,7 +116,9 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     };
     const controlButton=document.createElement('button');controlButton.type='button';controlButton.className='ghost';controlButton.textContent='รวมข้อมูลใบกำกับภาษี';
     controlButton.onclick=async()=>{if(!session||!orgId)return login();await window.TaxInvoiceControl.open(request,orgId);};
-    const taxActions=document.createElement('div');taxActions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';taxActions.append(controlButton,createButton);
+    const trashButton=document.createElement('button');trashButton.type='button';trashButton.className='ghost';trashButton.textContent='ถังขยะ';
+    trashButton.onclick=async()=>{if(!session||!orgId)return login();await window.TaxInvoiceControl.open(request,orgId,'trash');};
+    const taxActions=document.createElement('div');taxActions.style.cssText='display:flex;gap:10px;flex-wrap:wrap';taxActions.append(controlButton,trashButton,createButton);
     taxPanel.querySelector('.panel-title').append(taxActions);
     // Classification controls live in the document control center only.
     taxPanel.querySelector('.panel-title p')?.remove();

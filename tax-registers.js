@@ -11,14 +11,14 @@
     document.querySelector('#settings').before(page);
   }
   let month='', search='', generation=0;
-  const selectRows=(rows,month,search)=>rows.filter(r=>r.kind==='tax_invoice' && !['draft','cancelled'].includes(r.status) && (!month || String(r.issue_date).startsWith(month)) && [r.document_number,r.customer_name_snapshot,r.customer_tax_id_snapshot].join(' ').toLowerCase().includes(search.toLowerCase()));
+  const selectRows=(rows,month,search)=>rows.filter(r=>r.kind==='tax_invoice' && !r.deleted_at && !['draft','cancelled'].includes(r.status) && (!month || String(r.issue_date).startsWith(month)) && [r.document_number,r.customer_name_snapshot,r.customer_tax_id_snapshot].join(' ').toLowerCase().includes(search.toLowerCase()));
   const totals=rows=>rows.reduce((t,r)=>({base:t.base+Math.round(Number(r.taxable_amount||0)*100),vat:t.vat+Math.round(Number(r.vat_amount||0)*100),total:t.total+Math.round(Number(r.grand_total||0)*100)}),{base:0,vat:0,total:0});
   const load=async(request,orgId)=>{
     const current=++generation,page=document.querySelector('#sales-tax');
     page.innerHTML='<article class="panel settings-card"><h3>ภาษีขาย</h3><p role="status">กำลังโหลดใบกำกับภาษี…</p></article>';
     try{
       // Read the source invoices, never maintain a duplicate tax ledger.
-      const rows=await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.tax_invoice&select=id,kind,document_number,customer_name_snapshot,customer_tax_id_snapshot,issue_date,taxable_amount,vat_amount,grand_total,status&order=issue_date.desc,document_number.desc`);
+      const rows=await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.tax_invoice&select=id,kind,document_number,customer_name_snapshot,customer_tax_id_snapshot,issue_date,taxable_amount,vat_amount,grand_total,status,deleted_at&order=issue_date.desc,document_number.desc`);
       if(current!==generation)return;
       page.innerHTML=`<div class="page-toolbar"><h2>ภาษีขาย</h2><button class="ghost" data-refresh>รีเฟรชข้อมูล</button></div><article class="panel settings-card"><p>เชื่อมจากใบกำกับภาษีโดยตรง ไม่ต้องบันทึกซ้ำ • ไม่รวมเอกสารร่างและยกเลิก</p><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:end"><label class="field"><span>เดือนตามวันที่ใบกำกับภาษี</span><input type="month" data-month value="${e(month)}"></label><label class="field"><span>ค้นหาเลขที่เอกสาร / ลูกค้า / เลขผู้เสียภาษี</span><input type="search" data-search value="${e(search)}"></label><button class="ghost" data-all>แสดงทุกเดือน</button></div><p data-summary role="status"></p></article><article class="panel table-panel" style="overflow-x:auto;margin-top:16px"><table><thead><tr><th>วันที่</th><th>เลขที่ใบกำกับภาษี</th><th>ลูกค้า</th><th>เลขผู้เสียภาษี</th><th>มูลค่าก่อน VAT</th><th>ภาษีขาย (VAT)</th><th>ยอดรวม</th><th>เอกสารต้นทาง</th></tr></thead><tbody></tbody><tfoot></tfoot></table></article>`;
       const render=()=>{
