@@ -137,7 +137,7 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=(billing?1140:960)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
+    if(pages.length===1){while(y+32<=(billing?1140:1040)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
       const account=company.payment_account||{};
@@ -174,20 +174,32 @@
     }
     const extraNote=String(details.notes||'').trim();
     const noteText=billing?'':[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
-    const notes=billing?[]:wrap(noteText,R-L-40,18,false,measure);let at=0;
-    while(at<notes.length){if(y+110>1510){start();y+=16;}const capacity=Math.max(1,Math.floor((1510-y-60)/28)),part=notes.slice(at,at+capacity),h=60+part.length*28;
-      rect(L,y,R-L,h);text('หมายเหตุ / REMARKS'+(at?' (ต่อ)':''),L+20,y+15,15,true,'left',MUTED);part.forEach((s,i)=>text(s,L+20,y+48+i*28,18));y+=h+24;at+=part.length;
-    }
-    if(!billing&&y+414>1630){start();y+=20;}
     const amounts=billing?[]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
-    let standardHeight=0;
     if(!billing){
-      text('มาตรฐานการผลิตของโรงงาน',L,y+7,17,true,'left',INK);
+      let notes=wrap(noteText,590,16,false,measure),continued=false;
       const standardLines=productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
-      standardLines.forEach((value,i)=>text(value,L,y+39+i*25,16));
-      standardHeight=39+standardLines.length*25;
+      const fixedLeftHeight=39+18+39+standardLines.length*25;
+      while(true){
+        const finalCapacity=Math.floor((1630-y-28-161-fixedLeftHeight)/25);
+        if(finalCapacity>=notes.length)break;
+        if(!notes.length){start();y+=20;continue;}
+        const pageCapacity=Math.floor((1600-y-39)/25);
+        if(pageCapacity<1){start();y+=20;continue;}
+        const part=notes.splice(0,pageCapacity);
+        text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,y+7,17,true,'left',INK);
+        part.forEach((value,i)=>text(value,L,y+39+i*25,16));
+        continued=true;start();y+=20;
+      }
+      const sectionY=y;
+      text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,sectionY+7,17,true,'left',INK);
+      notes.forEach((value,i)=>text(value,L,sectionY+39+i*25,16));
+      const productionY=sectionY+39+notes.length*25+18;
+      text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);
+      standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));
+      const leftHeight=productionY-sectionY+39+standardLines.length*25;
+      amounts.forEach(([label,value],i)=>{const yy=sectionY+i*45,last=i===amounts.length-1;rect(713,yy,444,45,last?INK:'#ffffff');text(label,733,yy+12,18,last,'left',last?'#ffffff':INK);text(money(value),1137,yy+12,19,true,'right',last?'#ffffff':INK);});
+      y=sectionY+Math.max(amounts.length*45,leftHeight)+28;
     }
-    amounts.forEach(([label,value],i)=>{const yy=y+i*45,last=i===amounts.length-1;rect(713,yy,444,45,last?INK:'#ffffff');text(label,733,yy+12,18,last,'left',last?'#ffffff':INK);text(money(value),1137,yy+12,19,true,'right',last?'#ffffff':INK);});if(!billing)y+=Math.max(amounts.length*45,standardHeight)+28;
     (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
     pages.forEach((p,i)=>{page=p;line(L,1670,R,1670);text(title+' / '+english,L,1690,13,false,'left',MUTED);text((doc.document_number||'ตัวอย่าง')+'  |  หน้า '+(i+1)+' / '+pages.length,R,1690,13,false,'right',MUTED);});
     return pages;
