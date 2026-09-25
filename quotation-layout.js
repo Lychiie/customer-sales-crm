@@ -137,7 +137,7 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=(billing?1140:1040)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
+    if(pages.length===1){while(y+32<=(billing?1140:1104)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
       const account=company.payment_account||{};
