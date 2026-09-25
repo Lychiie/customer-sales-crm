@@ -25,6 +25,17 @@
     value.setUTCDate(value.getUTCDate()+days);
     return value.toISOString().slice(0,10);
   };
+  const quotationTerms=[
+    {text:'หมายเหตุ',bold:true},
+    {text:'ราคานี้ไม่รวมค่าจัดส่งนอกกรุงเทพฯ'},
+    {text:'โปรดระบุรายละเอียดให้ครบถ้วนก่อนสรุปราคาและสั่งผลิต'},
+    {text:'หากไม่ระบุรายละเอียดใดๆ จะถือว่าเป็นการผลิตตามมาตรฐานโรงงาน'},
+    {text:'หากเกิดความผิดพลาดขึ้นทางบริษัทฯ จะไม่รับผิดชอบ'},
+    {text:'มาตรฐานการผลิตของโรงงาน',bold:true,gap:14},
+    {text:'ถ้าไม่ระบุ ทางบริษัทฯ จะทำขนาดตลอด'},
+    {text:'ถ้าไม่ระบุสี ทางบริษัทฯ จะถือว่าเป็นสีอลูมิเนียม'},
+    {text:'ถ้าระบุมาว่าพ่นสี ทางบริษัทฯ จะถือว่าพ่นสีขาวตามมาตรฐานทางบริษัทฯ'}
+  ];
   const build=(company,doc,items,measure,logo=null)=>{
     const billing=doc.kind==='billing_note';
     const INK=billing?'#65516f':'#245b57',LINE=billing?'#d8cedd':'#c5d6d3',MUTED=billing?'#776b7f':'#526d69',HEADER=billing?'#f3eef5':'#edf5f3';
@@ -126,7 +137,7 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=(billing?1140:1040)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
+    if(pages.length===1){while(y+32<=(billing?1140:668)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
       const account=company.payment_account||{};
@@ -161,11 +172,23 @@
       text('รวมภาษีมูลค่าเพิ่มแล้ว',R,y+168,14,false,'right',MUTED);
       y+=bottomHeight+50;
     }
-    const notes=billing?[]:wrap(details.notes||'-',R-L-40,18,false,measure);let at=0;
-    while(at<notes.length){if(y+110>1510){start();y+=16;}const capacity=Math.max(1,Math.floor((1510-y-60)/28)),part=notes.slice(at,at+capacity),h=60+part.length*28;
-      rect(L,y,R-L,h);text('หมายเหตุ / REMARKS'+(at?' (ต่อ)':''),L+20,y+15,15,true,'left',MUTED);part.forEach((s,i)=>text(s,L+20,y+48+i*28,18));y+=h+24;at+=part.length;
+    const notes=billing?[]:wrap(String(details.notes||'').trim(),R-L-40,17,false,measure).filter(Boolean);let at=0;
+    if(notes.length>6)while(at<notes.length){if(y+110>1510){start();y+=16;}const capacity=Math.max(1,Math.floor((1510-y-60)/26)),part=notes.slice(at,at+capacity),h=58+part.length*26;
+      rect(L,y,R-L,h);text('หมายเหตุเพิ่มเติม'+(at?' (ต่อ)':''),L+20,y+14,14,true,'left',MUTED);part.forEach((s,i)=>text(s,L+20,y+44+i*26,17));y+=h+20;at+=part.length;
     }
-    if(!billing&&y+448>1630){start();y+=20;}
+    if(!billing){
+      const termRows=[...quotationTerms];
+      if(notes.length&&notes.length<=6)termRows.push({text:'หมายเหตุเพิ่มเติม',bold:true,gap:12},...notes.map(text=>({text})));
+      const termLines=termRows.flatMap(row=>wrap(row.text,R-L-40,16,Boolean(row.bold),measure).map((s,index)=>({s,bold:Boolean(row.bold),gap:index===0?Number(row.gap||0):0})));
+      const termHeight=36+termLines.reduce((height,row)=>height+row.gap+22,0);
+      if(y+termHeight+24+420>1640){start();y+=20;}
+      rect(L,y,R-L,termHeight,'#ffffff',LINE);
+      text('ข้อกำหนดและมาตรฐาน / TERMS & PRODUCTION STANDARD',L+20,y+12,13,true,'left',MUTED);
+      let termY=y+38;
+      termLines.forEach(row=>{termY+=row.gap;text(row.s,L+20,termY,16,row.bold);termY+=22;});
+      y+=termHeight+24;
+    }
+    if(!billing&&y+420>1640){start();y+=20;}
     const amounts=billing?[]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
     amounts.forEach(([label,value],i)=>{const yy=y+i*45,last=i===amounts.length-1;rect(713,yy,444,45,last?INK:'#ffffff');text(label,733,yy+12,18,last,'left',last?'#ffffff':INK);text(money(value),1137,yy+12,19,true,'right',last?'#ffffff':INK);});if(!billing)y+=amounts.length*45+28;
     (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
