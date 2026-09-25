@@ -197,8 +197,9 @@
       text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);
       standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));
       const leftHeight=productionY-sectionY+39+standardLines.length*25;
-      amounts.forEach(([label,value],i)=>{const yy=sectionY+i*45,last=i===amounts.length-1;rect(713,yy,444,45,last?INK:'#ffffff');text(label,733,yy+12,18,last,'left',last?'#ffffff':INK);text(money(value),1137,yy+12,19,true,'right',last?'#ffffff':INK);});
-      y=sectionY+Math.max(amounts.length*45,leftHeight)+28;
+      const amountHeight=Math.max(amounts.length*45,leftHeight),amountRowHeight=amountHeight/amounts.length;
+      amounts.forEach(([label,value],i)=>{const yy=sectionY+i*amountRowHeight,last=i===amounts.length-1,labelY=yy+(amountRowHeight-18)/2,valueY=yy+(amountRowHeight-19)/2;rect(713,yy,444,amountRowHeight,last?INK:'#ffffff');text(label,733,labelY,18,last,'left',last?'#ffffff':INK);text(money(value),1137,valueY,19,true,'right',last?'#ffffff':INK);});
+      y=sectionY+amountHeight+28;
     }
     (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
     pages.forEach((p,i)=>{page=p;line(L,1670,R,1670);text(title+' / '+english,L,1690,13,false,'left',MUTED);text((doc.document_number||'ตัวอย่าง')+'  |  หน้า '+(i+1)+' / '+pages.length,R,1690,13,false,'right',MUTED);});
