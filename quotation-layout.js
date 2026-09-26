@@ -105,7 +105,7 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
+      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดจัดส่งสินค้า',details.deliveryTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
       const detailHeight=billing?55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0):28+detailRows.reduce((h,row)=>h+Math.max(1,row.lines.length)*27+16,0);
       const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
       if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่'+title+' กรุณาตรวจข้อมูลก่อนพิมพ์');
@@ -136,7 +136,7 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=(billing?1140:1136)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
+    if(pages.length===1){while(y+32<=(billing?1140:1104)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
       const account=company.payment_account||{};
