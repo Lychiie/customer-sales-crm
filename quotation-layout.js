@@ -105,8 +105,8 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,365,18,true,measure)}));
-      const detailHeight=55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0);
+      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
+      const detailHeight=billing?55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0):28+detailRows.reduce((h,row)=>h+Math.max(1,row.lines.length)*27+16,0);
       const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
       if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่'+title+' กรุณาตรวจข้อมูลก่อนพิมพ์');
       rect(L,boxY,641,boxH);rect(748,boxY,409,boxH);line(748,boxY,748,boxY+boxH,INK,4);
@@ -114,8 +114,7 @@
       customerLines.forEach(s=>{text(s,L+22,ay,21,true);ay+=32;});
       address.forEach(s=>{text(s,L+22,ay,18);ay+=28;});
       tax.forEach(s=>{text(s,L+22,ay+5,16,false,'left',MUTED);ay+=25;});
-      text('รายละเอียด / DETAILS',770,boxY+19,16,false,'left',MUTED);
-      let detailY=boxY+55;detailRows.forEach(row=>{text(row.label,770,detailY,15,false,'left',MUTED);detailY+=25;row.lines.forEach(s=>{text(s,770,detailY,18,true);detailY+=27;});detailY+=12;});
+      let detailY=boxY+28;detailRows.forEach(row=>{text(row.label,770,detailY,15,false,'left',MUTED);row.lines.forEach((s,i)=>text(s,950,detailY+i*27,18,true));detailY+=Math.max(1,row.lines.length)*27+16;});
       y=boxY+boxH+38;tableTop=null;
     };
     const widths=billing?[64,470,170,190,180]:[50,550,100,130,90,154],xs=[L];widths.forEach(w=>xs.push(xs.at(-1)+w));
