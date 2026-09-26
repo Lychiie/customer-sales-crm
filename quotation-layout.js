@@ -105,7 +105,7 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['ยืนราคาถึง',date(doc.valid_until)],['กำหนดส่งสินค้า',details.deliveryTerms||'-'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,365,18,true,measure)}));
+      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,365,18,true,measure)}));
       const detailHeight=55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0);
       const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
       if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่'+title+' กรุณาตรวจข้อมูลก่อนพิมพ์');
