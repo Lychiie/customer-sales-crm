@@ -100,8 +100,8 @@
       text(title,R,76,39,true,'right');text(english,R,128,17,false,'right',MUTED);
       const no=wrap(doc.document_number||'ตัวอย่าง',345,19,true,measure);
       text('เลขที่เอกสาร',R,165,15,false,'right',MUTED);no.forEach((s,i)=>text(s,R,193+i*29,19,true,'right'));
-      const dy=193+no.length*29;text('วันที่ '+date(doc.issue_date),R,dy,18,false,'right');
-      const headBottom=Math.max(cy,dy+30)+28;line(L,headBottom,R,headBottom,INK,3);
+      const dy=193+no.length*29;
+      const headBottom=Math.max(cy,dy)+28;line(L,headBottom,R,headBottom,INK,3);
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
