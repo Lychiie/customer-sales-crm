@@ -23,8 +23,8 @@
     .dn-section-label{display:flex;justify-content:space-between;align-items:center;margin:0 0 2mm;font-size:12px}.dn-section-label span{color:#536174;font-size:10px}
     .dn-sheet table {width:100%;min-width:0;border-collapse:collapse;margin:0;table-layout:fixed}
     .dn-sheet th,.dn-sheet td {border:1px solid var(--dn-line);padding:3mm 2.5mm;text-align:left;white-space:normal;overflow-wrap:anywhere;font-size:12px;color:#1b2935;background:white;vertical-align:top}
-    .dn-sheet th{background:#f0f3f5;font-size:11px;border-top:2px solid var(--dn-ink);font-weight:600}.dn-sheet th small{font:9px/1.5 Arial,sans-serif;margin-top:1mm}
-    .dn-sheet td:nth-child(1),.dn-sheet th:nth-child(1),.dn-sheet td:nth-child(4),.dn-sheet th:nth-child(4){text-align:center}.dn-sheet td:nth-child(3),.dn-sheet th:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}.dn-sheet td:nth-child(3){font-weight:600}
+    .dn-sheet th{background:#f0f3f5;font-size:11px;border-top:2px solid var(--dn-ink);font-weight:600;text-align:center}.dn-sheet th small{font:9px/1.5 Arial,sans-serif;margin-top:1mm;text-align:center}
+    .dn-sheet td:nth-child(1),.dn-sheet td:nth-child(4){text-align:center}.dn-sheet td:nth-child(3){text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
     .dn-sheet td.dn-description{white-space:pre-wrap;overflow-wrap:anywhere}.dn-sheet td small{white-space:pre-wrap;margin-top:1mm}.dn-empty td{height:5mm;padding:0}.dn-sheet footer{margin-top:6mm}
     .dn-note{border:1px solid var(--dn-line);padding:3mm 4mm;min-height:19mm;white-space:pre-wrap;overflow-wrap:anywhere}.dn-note b{display:block;font-size:10px;color:#536174;margin-bottom:1mm}
     .dn-sign {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5mm;margin-top:6mm;break-inside:avoid;text-align:center}.dn-sign>div{border:1px solid var(--dn-line);padding:4mm 3mm}.dn-sign-line{height:12mm;border-bottom:1px dotted #7c8994;margin-bottom:2mm}.dn-sign p{font-weight:600}.dn-sign small{font-family:Arial,sans-serif;font-size:9px;margin-bottom:3mm}.dn-sign .dn-sign-date{font-size:10px;font-weight:400;color:#536174}
