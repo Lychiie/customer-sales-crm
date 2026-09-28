@@ -4,7 +4,7 @@
   const render=doc=>{
     if(doc.status==='cancelled')return '<span class="payment-cancelled">ยกเลิก</span>';
     const paid=doc.payment_received===true;
-    return `<label class="payment-control" style="display:inline-flex;gap:8px;align-items:center;white-space:nowrap;cursor:pointer"><input type="checkbox" data-payment-id="${escape(doc.id)}" data-payment-kind="${escape(doc.kind)}" data-payment-status="${escape(doc.status)}" data-payment-value="${paid}" aria-label="ชำระเงินแล้ว ${escape(doc.document_number)}" ${paid?'checked':''} style="width:18px;height:18px;accent-color:#287864"><span data-payment-label style="color:${paid?'#287864':'#b45309'}">${paid?'ชำระเงินแล้ว':'ค้างจ่าย'}</span></label><small data-payment-message role="status" style="display:block;max-width:240px;white-space:normal"></small>`;
+    return `<div class="payment-control" style="display:grid;justify-items:start;gap:6px"><span data-payment-label style="display:inline-flex;padding:3px 9px;border-radius:999px;background:${paid?'#e8f5ef':'#fff3df'};color:${paid?'#287864':'#9a5b00'};font-size:12px;font-weight:600">สถานะ: ${paid?'ชำระเงินแล้ว':'ค้างจ่าย'}</span><label style="display:inline-flex;gap:7px;align-items:center;white-space:nowrap;cursor:pointer;font-size:12px;color:#526173"><input type="checkbox" data-payment-id="${escape(doc.id)}" data-payment-kind="${escape(doc.kind)}" data-payment-status="${escape(doc.status)}" data-payment-value="${paid}" aria-label="ติ๊กเมื่อได้รับชำระเงิน ${escape(doc.document_number)}" ${paid?'checked':''} style="width:17px;height:17px;accent-color:#287864"><span>ติ๊กเมื่อได้รับชำระเงิน</span></label><small data-payment-message role="status" style="display:block;max-width:240px;white-space:normal"></small></div>`;
   };
   const pathFor=(org,id,kind)=>`/rest/v1/documents?organization_id=eq.${encodeURIComponent(org)}&id=eq.${encodeURIComponent(id)}&kind=eq.${encodeURIComponent(kind)}`;
   const valid=(rows,org,id,kind)=>Array.isArray(rows)&&rows.length===1&&rows[0].id===id&&rows[0].organization_id===org&&rows[0].kind===kind&&typeof rows[0].payment_received==='boolean';
@@ -37,7 +37,7 @@
       if(pending.has(key)){control.checked=previous;return;}
       const cell=control.closest('td'),label=cell.querySelector('[data-payment-label]'),message=cell.querySelector('[data-payment-message]');
       pending.add(key);control.disabled=true;message.textContent='กำลังบันทึก…';
-      const show=value=>{control.checked=value;control.dataset.paymentValue=String(value);label.textContent=value?'ชำระเงินแล้ว':'ค้างจ่าย';label.style.color=value?'#287864':'#b45309';};
+      const show=value=>{control.checked=value;control.dataset.paymentValue=String(value);label.textContent=`สถานะ: ${value?'ชำระเงินแล้ว':'ค้างจ่าย'}`;label.style.color=value?'#287864':'#9a5b00';label.style.background=value?'#e8f5ef':'#fff3df';};
       try{
         const saved=await save(request,org,id,kind,previous,paid);show(saved.payment_received);control.dataset.paymentStatus=saved.status;message.textContent='บันทึกแล้ว';control.disabled=false;onUpdated();
       }catch(error){
