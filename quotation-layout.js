@@ -253,8 +253,11 @@
     const x = 83, y = total.y, w = 590, h = 180;
     page.push({type:'rect',x,y,w,h,fill:'#f3f7f6',stroke:'#cbdedb'});
     page.push({type:'line',x,y,x2:x,y2:y+h,color:'#245b57',width:5});
-    page.push({type:'text',s:'ช่องทางการชำระเงิน',x:x+20,y:y+24,size:21,bold:true,align:'left',color:'#245b57'});
-    lines.forEach((s,i)=>page.push({type:'text',s,x:x+20,y:y+58+i*28,size:18,bold:i===0,align:'left',color:'#29384a'}));
+    page.push({type:'text',s:'ช่องทางการชำระเงิน',x:x+20,y:y+24,size:21,bold:true,align:'left',color:'#245b57'});    lines.forEach((s,i)=>{
+      const parts = i ? s.split('  เลขที่ ') : [s];
+      page.push({type:'text',s:parts[0],x:x+20,y:y+58+i*28,size:18,bold:i===0,align:'left',color:'#29384a'});
+      if (i) page.push({type:'text',s:'เลขที่ '+parts[1],x:x+230,y:y+58+i*28,size:18,bold:false,align:'left',color:'#29384a'});
+    });
     return pages;
   };
   const prepare = window.CashBillLayout.prepare;
