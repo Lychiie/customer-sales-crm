@@ -37,9 +37,9 @@
     'ถ้าระบุมาว่าพ่นสี ทางบริษัทฯ จะถือว่าพ่นสีขาวตามมาตรฐานทางบริษัทฯ'
   ];
   const build=(company,doc,items,measure,logo=null)=>{
-    const billing=doc.kind==='billing_note';
+    const billing=doc.kind==='billing_note',cash=doc.kind==='cash_bill';
     const INK=billing?'#65516f':'#245b57',LINE=billing?'#d8cedd':'#c5d6d3',MUTED=billing?'#776b7f':'#526d69',HEADER=billing?'#f3eef5':'#edf5f3';
-    const title=billing?'ใบวางบิล':'ใบเสนอราคา',english=billing?'BILLING NOTE':'QUOTATION';
+    const title=billing?'ใบวางบิล':cash?'บิลเงินสด':'ใบเสนอราคา',english=billing?'BILLING NOTE':cash?'CASH BILL':'QUOTATION';
     if(billing&&items.some(item=>item.kind!=='tax_invoice'||!item.document_number||item.grand_total==null||!Number.isFinite(Number(item.grand_total))||Number(item.grand_total)<0))throw Error('รายการใบวางบิลต้องเชื่อมกับใบกำกับภาษีที่ออกแล้ว');
     const billingTotal=billing?items.reduce((sum,item)=>sum+Math.round(Number(item.grand_total)*100),0)/100:0;
     const details=window.QuotationEditor?.decode(doc.notes)||{paymentTerms:'',deliveryTerms:'',notes:doc.notes||'',rates:[]};
@@ -105,7 +105,7 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดจัดส่งสินค้า',details.deliveryTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
+      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:cash?[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขชำระเงิน',details.paymentTerms||'เงินสด'],['สถานะชำระเงิน',doc.payment_received?'ชำระเงินแล้ว':'ค้างจ่าย']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดจัดส่งสินค้า',details.deliveryTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
       const detailHeight=billing?55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0):28+detailRows.reduce((h,row)=>h+Math.max(1,row.lines.length)*27+16,0);
       const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
       if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่'+title+' กรุณาตรวจข้อมูลก่อนพิมพ์');
@@ -172,11 +172,11 @@
       y+=bottomHeight+50;
     }
     const extraNote=String(details.notes||'').trim();
-    const noteText=billing?'':[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
-    const amounts=billing?[]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
+    const noteText=billing?'':cash?extraNote:[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
+    const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
     if(!billing){
-      let notes=wrap(noteText,590,16,false,measure),continued=false;
-      const standardLines=productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
+      let notes=noteText?wrap(noteText,590,16,false,measure):[],continued=false;
+      const standardLines=cash?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
       const fixedLeftHeight=39+18+39+standardLines.length*25;
       while(true){
         const finalCapacity=Math.floor((1630-y-28-161-fixedLeftHeight)/25);
@@ -185,29 +185,29 @@
         const pageCapacity=Math.floor((1600-y-39)/25);
         if(pageCapacity<1){start();y+=20;continue;}
         const part=notes.splice(0,pageCapacity);
-        text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,y+7,17,true,'left',INK);
+        if(!cash||part.length)text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,y+7,17,true,'left',INK);
         part.forEach((value,i)=>text(value,L,y+39+i*25,16));
         continued=true;start();y+=20;
       }
       const sectionY=y;
-      text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,sectionY+7,17,true,'left',INK);
+      if(!cash||notes.length)text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,sectionY+7,17,true,'left',INK);
       notes.forEach((value,i)=>text(value,L,sectionY+39+i*25,16));
       const productionY=sectionY+39+notes.length*25+18;
-      text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);
-      standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));
-      const leftHeight=productionY-sectionY+39+standardLines.length*25;
+      if(!cash){text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));}
+      const leftHeight=cash?39+notes.length*25:productionY-sectionY+39+standardLines.length*25;
       const amountHeight=Math.max(amounts.length*45,leftHeight),amountRowHeight=amountHeight/amounts.length;
       amounts.forEach(([label,value],i)=>{const yy=sectionY+i*amountRowHeight,last=i===amounts.length-1,labelY=yy+(amountRowHeight-18)/2,valueY=yy+(amountRowHeight-19)/2;rect(713,yy,444,amountRowHeight,last?INK:'#ffffff');text(label,733,labelY,18,last,'left',last?'#ffffff':INK);text(money(value),1137,valueY,19,true,'right',last?'#ffffff':INK);});
       y=sectionY+amountHeight+28;
     }
-    (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
+    (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:cash?[['ผู้รับเงิน','RECEIVED BY'],['ผู้จัดทำ','PREPARED BY'],['ลูกค้า / ผู้ชำระเงิน','CUSTOMER']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
     pages.forEach((p,i)=>{page=p;line(L,1670,R,1670);text(title+' / '+english,L,1690,13,false,'left',MUTED);text((doc.document_number||'ตัวอย่าง')+'  |  หน้า '+(i+1)+' / '+pages.length,R,1690,13,false,'right',MUTED);});
     return pages;
   };
-  const toSVG=pages=>pages.map((commands,i)=>`<svg xmlns="http://www.w3.org/2000/svg" class="qt-sheet" role="img" aria-label="ใบเสนอราคา หน้า ${i+1}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="white"/>${commands.map(c=>c.type==='image'?`<image x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" href="${escape(c.href)}" preserveAspectRatio="xMidYMid meet" aria-label="โลโก้บริษัท"/>`:c.type==='text'?`<text x="${c.x}" y="${c.y+c.size*.85}" font-family="Tahoma,Arial,sans-serif" font-size="${c.size}" font-weight="${c.bold?700:400}" text-anchor="${c.align==='right'?'end':c.align==='center'?'middle':'start'}" fill="${c.color}" xml:space="preserve">${escape(c.s)}</text>`:c.type==='rect'?`<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="${c.fill}" stroke="${c.stroke}"/>`:`<line x1="${c.x}" y1="${c.y}" x2="${c.x2}" y2="${c.y2}" stroke="${c.color}" stroke-width="${c.width}"/>`).join('')}</svg>`).join('');
+  const toSVG=(pages,label='ใบเสนอราคา')=>pages.map((commands,i)=>`<svg xmlns="http://www.w3.org/2000/svg" class="qt-sheet" role="img" aria-label="${label} หน้า ${i+1}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="white"/>${commands.map(c=>c.type==='image'?`<image x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" href="${escape(c.href)}" preserveAspectRatio="xMidYMid meet" aria-label="โลโก้บริษัท"/>`:c.type==='text'?`<text x="${c.x}" y="${c.y+c.size*.85}" font-family="Tahoma,Arial,sans-serif" font-size="${c.size}" font-weight="${c.bold?700:400}" text-anchor="${c.align==='right'?'end':c.align==='center'?'middle':'start'}" fill="${c.color}" xml:space="preserve">${escape(c.s)}</text>`:c.type==='rect'?`<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="${c.fill}" stroke="${c.stroke}"/>`:`<line x1="${c.x}" y1="${c.y}" x2="${c.x2}" y2="${c.y2}" stroke="${c.color}" stroke-width="${c.width}"/>`).join('')}</svg>`).join('');
   const draw=(pages,createCanvas)=>pages.map(commands=>{const canvas=createCanvas();canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);commands.forEach(c=>{if(c.type==='image'){ctx.drawImage(c.image,c.x,c.y,c.w,c.h);}else if(c.type==='text'){ctx.font=`${c.bold?'bold ':''}${c.size}px Tahoma,Arial,sans-serif`;ctx.textBaseline='alphabetic';ctx.textAlign=c.align;ctx.fillStyle=c.color;ctx.fillText(c.s,c.x,c.y+c.size*.85);}else if(c.type==='rect'){ctx.fillStyle=c.fill;ctx.fillRect(c.x,c.y,c.w,c.h);ctx.strokeStyle=c.stroke;ctx.lineWidth=1;ctx.strokeRect(c.x,c.y,c.w,c.h);}else{ctx.strokeStyle=c.color;ctx.lineWidth=c.width;ctx.beginPath();ctx.moveTo(c.x,c.y);ctx.lineTo(c.x2,c.y2);ctx.stroke();}});return canvas;});
   const prepare=async(company,doc,items)=>{await document.fonts.ready;const image=new Image();image.src=new URL('company-logo.png',document.baseURI).href;try{await image.decode();}catch{throw Error('โหลดโลโก้บริษัทไม่ได้ กรุณาโหลดหน้าเว็บใหม่ก่อนพิมพ์');}const asset=document.createElement('canvas');asset.width=image.naturalWidth;asset.height=image.naturalHeight;asset.getContext('2d').drawImage(image,0,0);const logo={image,href:asset.toDataURL('image/png'),width:image.naturalWidth,height:image.naturalHeight};const ctx=document.createElement('canvas').getContext('2d');return build(company,doc,items,(s,size,bold)=>{ctx.font=`${bold?'bold ':''}${size}px Tahoma,Arial,sans-serif`;return ctx.measureText(s).width;},logo);};
   const styles=`<style>#document-preview .qt-sheet{display:block;width:210mm;height:297mm;max-width:none;margin:24px auto;background:white;box-shadow:0 10px 45px #17203318}#document-preview .print-tools{flex-wrap:wrap}@media print{@page{size:A4;margin:0}#document-preview .qt-sheet{width:210mm;height:297mm;margin:0;box-shadow:none;break-after:page;page-break-after:always;print-color-adjust:exact}#document-preview .qt-sheet:last-child{break-after:auto;page-break-after:auto}}</style>`;
   window.QuotationLayout={build,toSVG,draw,prepare,styles};
-  window.BillingLayout={billingDueDate,build,draw,prepare,styles,toSVG:pages=>toSVG(pages).replaceAll('aria-label="ใบเสนอราคา หน้า','aria-label="ใบวางบิล หน้า')};
+  window.BillingLayout={billingDueDate,build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'ใบวางบิล')};
+  window.CashBillLayout={build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'บิลเงินสด')};
 })();
