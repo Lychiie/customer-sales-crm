@@ -47,6 +47,30 @@
       </main>
     </div>
     <dialog id="modal"><form method="dialog" id="modal-form"><button class="modal-close" value="cancel">×</button><div id="modal-content"></div></form></dialog>
+
+    <script>
+    // Close is a UI-only action: never submit or validate a document form.
+    (()=>{
+      const ids=['modal','tax-create-dialog','delivery-form','quotation-delivery-form','billing-create-dialog'];
+      const style=document.createElement('style');
+      style.textContent='.document-close-bar{display:flex;justify-content:flex-end;position:sticky;top:0;z-index:20;background:#fff;padding:8px 12px;box-sizing:border-box}dialog .document-close-button{display:grid;place-items:center;width:36px;height:36px;padding:0;margin:0;border:1px solid #dbe2e9;border-radius:9px;background:#fff;color:#566477;font:26px/1 Arial;cursor:pointer}dialog .document-close-button:hover{background:#f1f5f9;color:#172033}dialog .document-close-button:focus-visible{outline:2px solid #237e79;outline-offset:2px}';
+      document.head.append(style);
+      const attach=dialog=>{
+        if(dialog.querySelector('.document-close-bar'))return;
+        dialog.querySelector('.modal-close')?.remove();
+        const bar=document.createElement('div');bar.className='document-close-bar';
+        const button=document.createElement('button');button.type='button';button.className='document-close-button';button.textContent='×';button.setAttribute('aria-label','ปิดหน้าต่าง');button.title='ปิดหน้าต่าง';
+        button.onclick=()=>{
+          dialog.close('cancel');
+          if(dialog.id!=='modal')dialog.remove();
+        };
+        bar.append(button);dialog.prepend(bar);
+      };
+      const scan=()=>ids.forEach(id=>{const dialog=document.getElementById(id);if(dialog)attach(dialog);});
+      new MutationObserver(records=>{if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1)))scan();}).observe(document.body,{childList:true,subtree:true});
+      scan();
+    })();
+    </script>
     <script src="supabase-config.js"></script>
     <script src="app.js?v=catalog-fast-1"></script>
     <script src="quotation-filters.js?v=tax-status-1"></script>
@@ -54,7 +78,7 @@
     <script src="quotation-editor.js?v=tax-fast-1"></script>
     <script src="quotation-actions.js?v=delete-1"></script>
     <script src="quotation-tax.js?v=1"></script>
-    <script src="quotation-delivery.js?v=delivery-view-1"></script>
+    <script src="quotation-delivery.js?v=document-close-1"></script>
     <script src="billing-documents.js?v=1"></script>
     <script src="address-format.js?v=1"></script>
     <script src="quotation-layout.js?v=cash-two-rows-less-1"></script>
@@ -75,6 +99,6 @@
     <script src="customer-edit.js?v=1"></script>
     <script src="company-dashboard.js?v=1"></script>
     <script src="tax-invoice-edit.js?v=1"></script>
-    <script src="database.js?v=all-docs-fast-1"></script>
+    <script src="database.js?v=document-close-1"></script>
   </body>
 </html>
