@@ -78,8 +78,8 @@
     state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, statusCode: quote.status, status: status[quote.status] || quote.status }));
   };
   const syncCashBills = async () => {
-    const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.cash_bill&select=id,document_number,customer_name_snapshot,issue_date,grand_total,status,payment_received,deleted_at&order=created_at.desc`);
-    const bills=rows.filter(row=>!row.deleted_at),page=document.querySelector('#cash-bills');
+    const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.cash_bill&select=id,document_number,customer_name_snapshot,issue_date,subtotal,discount_amount,grand_total,status,payment_received,deleted_at&order=created_at.desc`);
+    const bills=rows.filter(row=>!row.deleted_at).map(row=>({...row,grand_total:Math.round((Number(row.subtotal)-Number(row.discount_amount||0))*100)/100})),page=document.querySelector('#cash-bills');
     page.innerHTML=`<div class="page-toolbar"><h2>บิลเงินสด</h2><button type="button" class="primary" data-new-cash-bill>+ สร้างบิลเงินสด</button></div><p>เอกสารขายอิสระ ไม่เชื่อมใบกำกับภาษี • ไม่คิด VAT</p><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>วันที่ออกบิล</th><th>ยอดรวม</th><th>สถานะชำระเงิน</th><th>เอกสาร</th></tr></thead><tbody>${bills.length?bills.map(b=>`<tr><td><strong>${escapeHtml(b.document_number)}</strong></td><td>${escapeHtml(b.customer_name_snapshot)}</td><td>${thaiDate(b.issue_date)}</td><td>฿ ${Number(b.grand_total).toLocaleString('th-TH',{minimumFractionDigits:2})}</td><td>${window.DocumentPayment.render(b)}</td><td><button type="button" class="ghost" data-print-document="${escapeHtml(b.document_number)}">ดู / พิมพ์</button></td></tr>`).join(''):'<tr><td colspan="6">ยังไม่มีบิลเงินสด กด “สร้างบิลเงินสด” เพื่อเริ่มออกเอกสาร</td></tr>'}</tbody></table></article>`;
     page.querySelector('[data-new-cash-bill]').onclick=()=>window.openForm('cash_bill');
   };
@@ -305,7 +305,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       }
       else if(modal.dataset.type==='cash_bill'&&session&&orgId){
         const customer=state.customers.find(item=>item.id===data.customerId);if(!customer)throw new Error('กรุณาเลือกลูกค้า');
-        const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,state.products,companyVatRate);
+        const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,state.products,0);
         if(!/^\d{4}-\d{2}-\d{2}$/.test(data.issueDate||''))throw new Error('กรุณาระบุวันที่ออกบิล');
         const id=crypto.randomUUID(),documentData={id,organization_id:orgId,kind:'cash_bill',document_number:`CB-${id.slice(0,8).toUpperCase()}`,status:'sent',payment_received:false,customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:data.issueDate,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms||'เงินสด',notes:data.notes||'',rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id};
         await window.QuotationEditor.persist(request,{id,document:documentData,items});modal.close();await syncAll();
