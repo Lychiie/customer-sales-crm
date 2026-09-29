@@ -154,7 +154,8 @@
       const noteLines=String(details.notes||'').trim()?wrap(String(details.notes).trim(),590,16,false,measure).length:0;
       const footerHeight=Math.max(180,39+noteLines*25)+28+161;
       const tableBottom=1630-24-footerHeight;
-      while(y<tableBottom){const rowHeight=Math.min(32,tableBottom-y);widths.forEach((w,i)=>rect(xs[i],y,w,rowHeight));y+=rowHeight;}
+      const blankRows=Math.max(0,Math.ceil((tableBottom-y)/32)-2);
+      for(let row=0;row<blankRows;row++){widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}
     }else if(pages.length===1){while(y+32<=(billing?1140:1104)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
