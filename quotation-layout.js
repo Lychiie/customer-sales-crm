@@ -236,3 +236,29 @@
   const build = window.CashBillLayout.build;
   window.CashBillLayout.build = (...args) => addReceivingAccounts(build(...args), args[1]);
 })();
+
+
+// Enlarge and balance the cash-bill payment details block.
+(() => {
+  const decorate = (pages, doc) => {
+    if (doc?.kind !== 'cash_bill' || !pages?.length) return pages;
+    const page = pages[pages.length - 1];
+    const total = page.find(command => command.type === 'rect' && command.x === 713 && command.w === 444);
+    if (!total) return pages;
+    const lines = ['ชื่อบัญชี  นางสาวเบญจมาศ สุภาษี','ธนาคารกสิกรไทย  เลขที่ 014-8-15927-0','ธนาคารกรุงเทพ  เลขที่ 030-7-231852','ธนาคารเกียรตินาคิน  เลขที่ 208-4-77636-5'];
+    for (let i = page.length - 1; i >= 0; i--) {
+      const command = page[i];
+      if (command.type === 'text' && (command.s === 'ช่องทางการชำระเงิน' || lines.includes(command.s))) page.splice(i, 1);
+    }
+    const x = 83, y = total.y, w = 590, h = 180;
+    page.push({type:'rect',x,y,w,h,fill:'#f3f7f6',stroke:'#cbdedb'});
+    page.push({type:'line',x,y,x2:x,y2:y+h,color:'#245b57',width:5});
+    page.push({type:'text',s:'ช่องทางการชำระเงิน',x:x+20,y:y+24,size:21,bold:true,align:'left',color:'#245b57'});
+    lines.forEach((s,i)=>page.push({type:'text',s,x:x+20,y:y+58+i*28,size:18,bold:i===0,align:'left',color:'#29384a'}));
+    return pages;
+  };
+  const prepare = window.CashBillLayout.prepare;
+  window.CashBillLayout.prepare = async (...args) => decorate(await prepare(...args), args[1]);
+  const build = window.CashBillLayout.build;
+  window.CashBillLayout.build = (...args) => decorate(build(...args), args[1]);
+})();
