@@ -57,21 +57,26 @@
     const rows = await request(`/rest/v1/customers?organization_id=eq.${orgId}&select=*&order=created_at.desc`);
     state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
+  let productTrash=[],productTrashOrg=null;
   const syncProducts = async () => {
-    const rows = await request(`/rest/v1/products?organization_id=eq.${orgId}&select=id,code,name,unit,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc`);
-    state.products = rows.flatMap((product) => (product.product_variants || []).filter((variant) => variant.is_active).map((variant) => {
-      const price = (variant.variant_prices || []).sort((a, b) => String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price ?? 0;
-      return { id: variant.id, productId: product.id, sku: variant.sku || product.code, name: product.name, unit: product.unit || 'ชิ้น', size: variant.label, price: Number(price).toFixed(2), status: product.is_active ? 'ใช้งาน' : 'ปิดใช้งาน' };
+    const requestOrg=orgId;
+    const rows = await request('/rest/v1/products?organization_id=eq.'+encodeURIComponent(requestOrg)+'&select=id,code,name,unit,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc');
+    if(orgId!==requestOrg)return;
+    const products=rows.flatMap(product=>(product.product_variants||[]).map(variant=>{
+      const price=(variant.variant_prices||[]).sort((a,b)=>String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price??0;
+      return {id:variant.id,productId:product.id,sku:variant.sku||product.code,name:product.name,unit:product.unit||'ชิ้น',size:variant.label,price:Number(price).toFixed(2),status:product.is_active?'ใช้งาน':'ปิดใช้งาน',isActive:variant.is_active};
     }));
+    state.products=products.filter(product=>product.isActive);
+    productTrash=products.filter(product=>!product.isActive);productTrashOrg=requestOrg;
+    renderProductTrash();
   };
-
   // Deactivate individual product variants; document snapshots and price history stay intact.
   let productDeleteBusy=false,lastDeletedProduct=null;
   const productDeleteNotice=document.createElement('div');
   productDeleteNotice.setAttribute('role','status');
   productDeleteNotice.style.cssText='margin:12px 0;color:#526173';
   document.querySelector('#product-body').closest('article').before(productDeleteNotice);
-  const refreshProductList=()=>{render();document.querySelector('#product-search').dispatchEvent(new Event('input'));};
+  const refreshProductList=()=>{render();document.querySelector('#product-search').dispatchEvent(new Event('input'));renderProductTrash();};
   const showProductDeleteNotice=(message,undo=false)=>{
     productDeleteNotice.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.className='ghost';button.dataset.undoProductDelete='';button.textContent='เลิกทำ';button.style.marginLeft='12px';productDeleteNotice.append(button);}
@@ -94,11 +99,56 @@
       if(!Array.isArray(saved)||saved.length!==1||saved[0].id!==product.id||saved[0].is_active!==active)throw Error('บัญชีนี้ไม่มีสิทธิ์แก้ไขสินค้า หรือไม่พบรายการ');
       if(orgId!==actionOrg)return;
       state.products=state.products.filter(item=>item.id!==product.id);
-      if(active){state.products.unshift(product);lastDeletedProduct=null;showProductDeleteNotice('กู้คืนสินค้า '+product.name+' แล้ว');}
-      else{lastDeletedProduct={org:actionOrg,product};showProductDeleteNotice('ลบสินค้า '+product.name+' / '+product.size+' แล้ว',true);}
+      if(active){state.products.unshift({...product,isActive:true});productTrash=productTrash.filter(item=>item.id!==product.id);lastDeletedProduct=null;showProductDeleteNotice('กู้คืนสินค้า '+product.name+' แล้ว');}
+      else{productTrash=productTrash.filter(item=>item.id!==product.id);productTrash.unshift({...product,isActive:false});productTrashOrg=actionOrg;lastDeletedProduct={org:actionOrg,product};showProductDeleteNotice('ย้ายเข้าถังขยะ '+product.name+' / '+product.size+' แล้ว',true);}
       refreshProductList();
     }catch(error){showProductDeleteNotice('บันทึกไม่สำเร็จ: '+error.message,Boolean(lastDeletedProduct&&lastDeletedProduct.org===orgId));}
     finally{productDeleteBusy=false;if((remove||undo).isConnected)(remove||undo).disabled=false;}
+  });
+
+  const productTrashButton=document.createElement('button');
+  productTrashButton.type='button';productTrashButton.className='ghost';productTrashButton.textContent='ถังขยะ (0)';productTrashButton.style.marginLeft='auto';
+  document.querySelector('#add-product').before(productTrashButton);
+  const productTrashDialog=document.createElement('dialog');
+  productTrashDialog.setAttribute('aria-label','ถังขยะสินค้า');
+  productTrashDialog.style.cssText='width:min(960px,94vw);max-height:85vh;overflow:auto;border:1px solid #dce3eb;border-radius:16px;padding:24px;color:#24344e';
+  productTrashDialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:16px"><h2 style="margin:0">ถังขยะสินค้า</h2><button type="button" class="ghost" data-close-product-trash>ปิด</button></div><p>สินค้าที่ลบจะอยู่ที่นี่จนกว่าจะกู้คืนหรือลบถาวร</p><p role="status" data-product-trash-message></p><div style="overflow-x:auto"><table style="width:100%"><thead><tr><th>รหัสสินค้า</th><th>รายการสินค้า</th><th>ขนาด / สเปก</th><th>ราคาขาย</th><th>จัดการ</th></tr></thead><tbody data-product-trash-rows></tbody></table></div>';
+  document.body.append(productTrashDialog);
+  const productTrashEscape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  function renderProductTrash(){
+    productTrashButton.textContent='ถังขยะ ('+productTrash.length+')';
+    productTrashDialog.querySelector('[data-product-trash-rows]').innerHTML=productTrash.length?productTrash.map(product=>'<tr><td>'+productTrashEscape(product.sku)+'</td><td>'+productTrashEscape(product.name)+'</td><td>'+productTrashEscape(product.size)+'</td><td>฿ '+productTrashEscape(product.price)+'</td><td style="white-space:nowrap"><button type="button" class="ghost" data-restore-product="'+productTrashEscape(product.id)+'" '+(productDeleteBusy?'disabled':'')+'>กู้คืน</button> <button type="button" class="ghost" style="color:#bd3345;border-color:#edcbd0" data-purge-product="'+productTrashEscape(product.id)+'" '+(productDeleteBusy?'disabled':'')+'>ลบถาวร</button></td></tr>').join(''):'<tr><td colspan="5" style="text-align:center;padding:32px">ถังขยะว่าง</td></tr>';
+  }
+  productTrashButton.onclick=async()=>{
+    if(!session||!orgId){login();return;}
+    if(productDeleteBusy)return;
+    const message=productTrashDialog.querySelector('[data-product-trash-message]');
+    productTrash=[];renderProductTrash();message.textContent='กำลังโหลด…';productTrashDialog.showModal();
+    try{await syncProducts();refreshProductList();message.textContent='';}catch(error){message.textContent='โหลดถังขยะไม่สำเร็จ: '+error.message;}
+  };
+  productTrashDialog.querySelector('[data-close-product-trash]').onclick=()=>productTrashDialog.close();
+  productTrashDialog.addEventListener('click',async event=>{
+    const restore=event.target.closest('[data-restore-product]'),purge=event.target.closest('[data-purge-product]');
+    if((!restore&&!purge)||productDeleteBusy)return;
+    const message=productTrashDialog.querySelector('[data-product-trash-message]');
+    if(!session||!orgId||productTrashOrg!==orgId){message.textContent='กรุณาปิดแล้วเปิดถังขยะใหม่';return;}
+    const product=productTrash.find(item=>item.id===(restore?.dataset.restoreProduct||purge?.dataset.purgeProduct));
+    if(!product)return;
+    if(purge&&!window.confirm('ลบถาวร '+product.name+' / '+product.size+' ('+product.sku+')?\nสินค้าและประวัติราคานี้จะกู้คืนไม่ได้ ข้อมูลในเอกสารเดิมยังคงอยู่'))return;
+    const actionOrg=orgId;productDeleteBusy=true;renderProductTrash();message.textContent=purge?'กำลังลบถาวร…':'กำลังกู้คืน…';
+    const path='/rest/v1/product_variants?id=eq.'+encodeURIComponent(product.id)+'&product_id=eq.'+encodeURIComponent(product.productId)+'&is_active=eq.false&select=id,is_active';
+    try{
+      const saved=await request(path,{method:purge?'DELETE':'PATCH',headers:{Prefer:'return=representation'},...(restore?{body:JSON.stringify({is_active:true})}:{})});
+      if(!Array.isArray(saved)||saved.length!==1||saved[0].id!==product.id||(restore&&saved[0].is_active!==true))throw Error('รายการอาจเปลี่ยนไป หรือบัญชีนี้ไม่มีสิทธิ์จัดการสินค้า');
+      if(orgId!==actionOrg)return;
+      productTrash=productTrash.filter(item=>item.id!==product.id);
+      if(restore){state.products=state.products.filter(item=>item.id!==product.id);state.products.unshift({...product,isActive:true});}
+      if(lastDeletedProduct?.product.id===product.id)lastDeletedProduct=null;
+      const result=(purge?'ลบถาวร ':'กู้คืน ')+product.name+' แล้ว';message.textContent=result;showProductDeleteNotice(result);refreshProductList();
+    }catch(error){
+      message.textContent='ดำเนินการไม่สำเร็จ: '+error.message;
+      try{await syncProducts();refreshProductList();}catch{}
+    }finally{productDeleteBusy=false;renderProductTrash();}
   });
   const syncCompanyProfile = async () => {
     const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,vat_rate&limit=1`))[0];
