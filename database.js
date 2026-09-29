@@ -60,12 +60,20 @@
   let productTrash=[],productTrashOrg=null;
   const syncProducts = async () => {
     const requestOrg=orgId;
-    const rows = await request('/rest/v1/products?organization_id=eq.'+encodeURIComponent(requestOrg)+'&select=id,code,name,unit,is_active,product_variants(id,sku,label,is_active,variant_prices(price,starts_on))&order=created_at.desc');
-    if(orgId!==requestOrg)return;
-    const products=rows.flatMap(product=>(product.product_variants||[]).map(variant=>{
+    // Page variants directly: embedded variants are capped per product by the API.
+    const rows=[],pageSize=500;
+    for(let offset=0;;offset+=pageSize){
+      const page=await request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(requestOrg)+'&order=id.asc&limit='+pageSize+'&offset='+offset);
+      if(orgId!==requestOrg)return;
+      if(!Array.isArray(page))throw Error('โหลดรายการสินค้าไม่สำเร็จ');
+      rows.push(...page);
+      if(page.length<pageSize)break;
+    }
+    const products=rows.map(variant=>{
+      const product=variant.product;
       const price=(variant.variant_prices||[]).sort((a,b)=>String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price??0;
       return {id:variant.id,productId:product.id,sku:variant.sku||product.code,name:product.name,unit:product.unit||'ชิ้น',size:variant.label,price:Number(price).toFixed(2),status:product.is_active?'ใช้งาน':'ปิดใช้งาน',isActive:variant.is_active};
-    }));
+    }).sort((a,b)=>a.sku.localeCompare(b.sku,undefined,{numeric:true}));
     state.products=products.filter(product=>product.isActive);
     productTrash=products.filter(product=>!product.isActive);productTrashOrg=requestOrg;
     renderProductTrash();
