@@ -23,7 +23,7 @@
     for(const [id,kind] of Object.entries(pages)){
       const page=document.getElementById(id);if(!page)continue;
       // Only real saved rows have a view/print control. Empty-state rows are skipped.
-      page.querySelectorAll('tbody tr').forEach(row=>{
+      page.querySelectorAll(id==='invoices'?'article:first-of-type table tbody tr':'tbody tr').forEach(row=>{
         if(!row.querySelector('[data-print-document],[data-view]')||row.querySelector('[data-delete-sales-document]'))return;
         const number=row.cells[0]?.textContent.trim();if(!number)return;
         const button=document.createElement('button');button.type='button';button.className='ghost';button.style.color='#b42332';button.textContent='ลบ';
