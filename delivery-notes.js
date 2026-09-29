@@ -1,7 +1,8 @@
 (() => {
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const date = value => new Date(value + 'T00:00:00').toLocaleDateString('th-TH');
-  let api, organizationId, company;
+  let api, organizationId, company, editorContext;
+  const configureEditor=(org,customers,lookupProducts)=>{editorContext={org,customers,lookupProducts};};
   const style = document.createElement('style');
   style.textContent = `
     #delivery-form {width:min(850px,95vw);max-height:92vh;border:0;border-radius:16px;padding:28px;overflow:auto}
@@ -47,21 +48,20 @@
     document.body.append(panel);
   };
   const openForm = async () => {
-    const [customers, products] = await Promise.all([
-      api(`/rest/v1/customers?organization_id=eq.${organizationId}&select=id,name,tax_id,billing_address&order=name`),
-      window.ProductCodePicker.catalog()
-    ]);
-    const variants = products.filter(p=>p.isActive!==false&&p.status!=='ปิดใช้งาน').map(p=>({...p,label:p.size,unit:p.unit||'ชิ้น'}));
-    if (!customers.length || !variants.length) throw new Error('กรุณาเพิ่มลูกค้าและสินค้าก่อนสร้างใบส่งสินค้า');
+    if(document.querySelector('#delivery-form'))return;
+    if(!editorContext||editorContext.org!==organizationId)throw Error('กรุณารอข้อมูลลูกค้าแล้วเปิดฟอร์มใหม่');
+    const {customers,lookupProducts}=editorContext,actionOrg=organizationId,actionApi=api,variants=[];
+    if(!customers.length)throw Error('กรุณาเพิ่มลูกค้าก่อนสร้างใบส่งสินค้า');
     const dialog = document.createElement('dialog'); dialog.id = 'delivery-form';
     dialog.innerHTML = `<form><h2>สร้างใบส่งสินค้า</h2><label class="field"><span>ลูกค้า</span><select name="customer" required>${customers.map(c=>`<option value="${escape(c.id)}">${escape(c.name)}</option>`).join('')}</select></label><label class="field"><span>วันที่ส่งสินค้า</span><input type="date" name="date" required></label><label class="field"><span>สถานที่จัดส่ง</span><textarea name="shipping" required maxlength="1500" placeholder="ชื่อสถานที่ / ที่อยู่ / จุดรับสินค้า"></textarea></label><button type="button" class="ghost" data-copy>ใช้ที่อยู่ลูกค้าเป็นสถานที่จัดส่ง</button><h3>รายการสินค้า <span data-line-count></span></h3><p>กดเพิ่มรายการเพื่อเลือกสินค้าและจำนวนแยกแต่ละแถว เพิ่มได้มากกว่า 12 รายการ โดยเอกสารยาวจะพิมพ์ต่อหน้า</p><div data-lines></div><button type="button" class="primary" style="width:100%;margin:12px 0" data-add>+ เพิ่มรายการสินค้าอีกแถว</button><label class="field"><span>หมายเหตุ</span><textarea name="notes" maxlength="1500"></textarea></label><p class="dn-error" role="status"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="button" class="ghost" data-preview>ดูตัวอย่าง</button><button type="submit" class="primary">บันทึกใบส่งสินค้า</button></div></form>`;
     const form=dialog.querySelector('form'); let pendingId=crypto.randomUUID(), saving=false;
     const today=new Date(); form.elements.date.value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const updateLines=()=>{const lines=[...dialog.querySelectorAll('.dn-line')];dialog.querySelector('[data-line-count]').textContent=`(${lines.length} รายการ)`;lines.forEach((line,i)=>{line.querySelector('[data-line-title]').textContent=`รายการที่ ${i+1} — สินค้า / ขนาด`;});};
-    const addLine=()=>{const line=document.createElement('div');line.className='dn-line';line.innerHTML=`<div><span data-line-title>สินค้า / ขนาด</span><div data-sku-picker></div><input type="hidden" data-variant></div><label>จำนวน<input data-dn-qty aria-label="จำนวน" type="number" min="0.001" max="99999999999" step="0.001" value="1" required></label><button type="button" class="ghost" aria-label="ลบรายการ">ลบ</button>`;line.querySelector('button').onclick=()=>{line.remove();updateLines();};window.ProductCodePicker.mount(line.querySelector('[data-sku-picker]'),variants,v=>{line.querySelector('[data-variant]').value=v?.id??'';});dialog.querySelector('[data-lines]').append(line);updateLines();};
+    const addLine=()=>{const line=document.createElement('div');line.className='dn-line';line.innerHTML=`<div><span data-line-title>สินค้า / ขนาด</span><div data-sku-picker></div><input type="hidden" data-variant></div><label>จำนวน<input data-dn-qty aria-label="จำนวน" type="number" min="0.001" max="99999999999" step="0.001" value="1" required></label><button type="button" class="ghost" aria-label="ลบรายการ">ลบ</button>`;line.querySelector('button').onclick=()=>{line.remove();updateLines();};window.ProductCodePicker.mount(line.querySelector('[data-sku-picker]'),variants,v=>{if(v){const item={...v,label:v.size,unit:v.unit||'ชิ้น'},i=variants.findIndex(p=>p.id===v.id);if(i<0)variants.push(item);else variants[i]=item;}line.querySelector('[data-variant]').value=v?.id??'';},{lookup:lookupProducts});dialog.querySelector('[data-lines]').append(line);updateLines();};
     dialog.querySelector('[data-add]').onclick=addLine;addLine();
     dialog.querySelector('[data-copy]').onclick=()=>{form.elements.shipping.value=customers.find(c=>c.id===form.elements.customer.value)?.billing_address || '';};
     const collect=()=>{
+      if(actionOrg!==organizationId)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
       if(!form.reportValidity()) return null;
       const c=customers.find(c=>c.id===form.elements.customer.value);
       const lines=[...dialog.querySelectorAll('.dn-line')].map(line=>{const v=variants.find(v=>v.id===line.querySelector('[data-variant]').value);return {variant_id:v.id,sku:v.sku,name:v.name,specification:v.label,unit:v.unit,quantity:Number(line.querySelector('[data-dn-qty]').value)};});
@@ -72,7 +72,7 @@
     dialog.querySelector('[data-preview]').onclick=()=>{try{const data=collect();if(data){dialog.close();preview(data.doc,data.items);document.querySelector('#dn-preview [data-close]').onclick=()=>{document.querySelector('#dn-preview').remove();dialog.showModal();};}}catch(e){dialog.querySelector('.dn-error').textContent=e.message;}};
     dialog.querySelector('[data-cancel]').onclick=()=>{dialog.remove();};dialog.addEventListener('cancel',()=>dialog.remove());
     form.onsubmit=async event=>{event.preventDefault();if(saving)return;try{const data=collect();if(!data)return;saving=true;form.querySelector('button[type=submit]').disabled=true;dialog.querySelector('.dn-error').textContent='กำลังบันทึก…';
-      const id=await api('/rest/v1/rpc/save_delivery_note',{method:'POST',body:JSON.stringify({p_id:pendingId,p_org:organizationId,p_customer:data.doc.customer_id,p_date:data.doc.issue_date,p_shipping:data.doc.shipping_address,p_notes:data.doc.notes,p_items:data.items.map(i=>({variant_id:i.variant_id,quantity:i.quantity}))})});
+      const id=await actionApi('/rest/v1/rpc/save_delivery_note',{method:'POST',body:JSON.stringify({p_id:pendingId,p_org:actionOrg,p_customer:data.doc.customer_id,p_date:data.doc.issue_date,p_shipping:data.doc.shipping_address,p_notes:data.doc.notes,p_items:data.items.map(i=>({variant_id:i.variant_id,quantity:i.quantity}))})});
       dialog.remove();await load(api,organizationId);await showSaved(id);
     }catch(e){dialog.querySelector('.dn-error').textContent=`บันทึกไม่สำเร็จ: ${e.message}`;}finally{saving=false;const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=false;}};
     document.body.append(dialog);dialog.showModal();
@@ -89,5 +89,5 @@
     }catch(e){page.innerHTML=`<article class="panel settings-card"><h3>ใบส่งสินค้า</h3><p class="dn-error">ยังโหลดใบส่งสินค้าไม่ได้: ${escape(e.message)}</p><button class="ghost" data-retry>ลองใหม่</button></article>`;page.querySelector('[data-retry]').onclick=()=>load(api,organizationId);}
   };
   const openSaved=async(request,orgId,id)=>{await load(request,orgId);await showSaved(id);};
-  window.DeliveryNotes={load,buildSheet,openSaved};
+  window.DeliveryNotes={load,buildSheet,openSaved,configureEditor};
 })();
