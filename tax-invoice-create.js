@@ -30,7 +30,7 @@
     pending.set(key,operation);operation.then(()=>pending.delete(key),()=>pending.delete(key));return operation;
   };
   const open = context => {
-    const {request,org,user,customers,products,quotes,links,vatRate,onSaved}=context;
+    const {request,org,user,customers,products,quotes,links,vatRate,onSaved,lookupProducts}=context;
     if(document.querySelector('#tax-create-dialog'))return;
     const storageKey=`flowbill-pending-tax:${org}:${user}`;
     let recovery;
@@ -51,7 +51,7 @@
       root.querySelector('[data-close]').onclick=close;
     };
     const manual=()=>{
-      mode='manual';editor=window.QuotationEditor.mount(root,customers,products,{vatRate});
+      mode='manual';editor=window.QuotationEditor.mount(root,customers,products,{vatRate,productLookup:lookupProducts});
       root.querySelector('.form-content').style.padding='30px';
       root.querySelector('h2').textContent='สร้างใบกำกับภาษีใหม่';
       const numberingNotice=root.querySelector('h2').nextElementSibling;
@@ -62,7 +62,7 @@
       const submit=root.querySelector('button[value=default]');submit.textContent='บันทึกใบกำกับภาษี';
       const cancel=root.querySelector('button[value=cancel]');cancel.type='button';cancel.onclick=close;
       const error=document.createElement('p');error.dataset.taxError='';error.setAttribute('role','alert');error.style.color='#b42318';root.querySelector('.form-actions').before(error);
-      if(!customers.length||!products.some(p=>p.status!=='ปิดใช้งาน')){status('กรุณาเพิ่มลูกค้าและสินค้าในคลังข้อมูลก่อน');submit.disabled=true;}
+      if(!customers.length||(!lookupProducts&&!products.some(p=>p.status!=='ปิดใช้งาน'))){status('กรุณาเพิ่มลูกค้าและสินค้าในคลังข้อมูลก่อน');submit.disabled=true;}
     };
     const fromQuote=()=>{
       mode='quote';const available=candidates(quotes,links);
