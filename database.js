@@ -55,8 +55,13 @@
     if (!memberships.length) throw new Error('บัญชีนี้ยังไม่มีสิทธิ์องค์กร CRM');
     orgId = memberships[0].organization_id; localStorage.setItem('flowbill-org-id', orgId);
   };
+  let customersReadyOrg=null;
   const syncCustomers = async () => {
-    const rows = await request(`/rest/v1/customers?organization_id=eq.${orgId}&select=*&order=created_at.desc`);
+    const customerOrg=orgId;
+    const rows = await request(`/rest/v1/customers?organization_id=eq.${customerOrg}&select=*&order=created_at.desc`);
+    if(orgId!==customerOrg)return;
+    customersReadyOrg=customerOrg;
+    window.DeliveryNotes?.configureEditor(customerOrg,rows,query=>lookupProductCodes(query,customerOrg));
     state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
   // A new tax invoice only needs the SKU being entered, not the full catalog.
@@ -326,22 +331,30 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   button.onclick = login;
   const baseOpenForm = window.openForm;
   let quotationEditor, pendingQuotation, savingQuotation = false;
+  let editorProducts=[],editorCustomers=[],editorOrg=null,openingDocument=0;
   modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
-    if (type === 'cash_bill') {
-      if (session) {await syncAll();await ensureProducts();}
-      if (!session || !orgId) return login();
-      quotationEditor=window.QuotationEditor.mount(document.querySelector('#modal-content'),state.customers,state.products,{vatRate:0,kind:'cash_bill'});
-      modal.dataset.type='cash_bill';modal.showModal();return;
+    const token=++openingDocument;
+    if(!['quotation','cash_bill'].includes(type))return baseOpenForm(type);
+    if(!session)return login();
+    const root=document.querySelector('#modal-content');
+    if(!productsOrganizationReady||customersReadyOrg!==orgId){
+      modal.dataset.type='loading-document';
+      root.innerHTML='<div class="form-content"><h2>กำลังเปิดฟอร์มเอกสาร</h2><p role="status">กำลังโหลดข้อมูลลูกค้า… ไม่ต้องรอคลังสินค้า</p><button type="button" class="ghost" data-close-loading>ยกเลิก</button></div>';
+      root.querySelector('[data-close-loading]').onclick=()=>modal.close();modal.showModal();
+      try{if(!productsOrganizationReady)await loadOrganization();await syncCustomers();}
+      catch(error){if(modal.open&&token===openingDocument)root.querySelector('[role=status]').textContent='โหลดลูกค้าไม่สำเร็จ: '+error.message+' กรุณาปิดแล้วเปิดฟอร์มใหม่';return;}
+      if(!modal.open||token!==openingDocument)return;
     }
-    if (type !== 'quotation') return baseOpenForm(type);
-    // A browser can restore its local preview before the database requests
-    // finish. Refresh first so option values always carry real database IDs.
-    if (session) {await syncAll();await ensureProducts();}
-    if (!session || !orgId) return login();
-    pendingQuotation = null;
-    quotationEditor = window.QuotationEditor.mount(document.querySelector('#modal-content'), state.customers, state.products);
-    modal.dataset.type = 'quotation'; modal.showModal();
+    if(!orgId)return login();
+    editorOrg=orgId;editorCustomers=state.customers.slice();editorProducts=[];
+    const actionOrg=editorOrg;
+    if(type==='quotation')pendingQuotation=null;
+    quotationEditor=window.QuotationEditor.mount(root,editorCustomers,editorProducts,{
+      ...(type==='cash_bill'?{vatRate:0,kind:'cash_bill'}:{}),
+      productLookup:query=>lookupProductCodes(query,actionOrg)
+    });
+    modal.dataset.type=type;if(!modal.open)modal.showModal();
   };
   const addProduct = async (data) => {
     const products = await request('/rest/v1/products', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ organization_id: orgId, code: data.sku, name: data.name, unit: 'ชิ้น' }) });
@@ -350,10 +363,11 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     await syncProducts(); render();
   };
   const addQuotation = async (data) => {
-    const customer = state.customers.find((item) => item.id === data.customerId);
+    if(editorOrg!==orgId)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
+    const customer = editorCustomers.find((item) => item.id === data.customerId);
     if (!customer) throw new Error('กรุณาเลือกลูกค้า');
     const rows = quotationEditor.read();
-    const {items,...totals} = window.QuotationEditor.calculate(rows,state.products);
+    const {items,...totals} = window.QuotationEditor.calculate(rows,editorProducts);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.expires||'')) throw new Error('กรุณาระบุวันยืนราคา');
     const inputKey = JSON.stringify({data,rows});
     if (pendingQuotation && pendingQuotation.inputKey !== inputKey) throw new Error('การบันทึกก่อนหน้ายังไม่สมบูรณ์ กรุณากลับเป็นข้อมูลเดิมแล้วกดบันทึกซ้ำเพื่อไม่ให้เกิดเอกสารซ้ำ');
@@ -469,8 +483,9 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
         try {await addQuotation(data);} finally {savingQuotation=false;controls.forEach(c=>c.disabled=false);}
       }
       else if(modal.dataset.type==='cash_bill'&&session&&orgId){
-        const customer=state.customers.find(item=>item.id===data.customerId);if(!customer)throw new Error('กรุณาเลือกลูกค้า');
-        const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,state.products,0);
+        if(editorOrg!==orgId)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
+        const customer=editorCustomers.find(item=>item.id===data.customerId);if(!customer)throw new Error('กรุณาเลือกลูกค้า');
+        const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,editorProducts,0);
         if(!/^\d{4}-\d{2}-\d{2}$/.test(data.issueDate||''))throw new Error('กรุณาระบุวันที่ออกบิล');
         const id=crypto.randomUUID(),documentData={id,organization_id:orgId,kind:'cash_bill',document_number:`CB-${id.slice(0,8).toUpperCase()}`,status:'sent',payment_received:false,customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:data.issueDate,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms||'เงินสด',notes:data.notes||'',rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id};
         await window.QuotationEditor.persist(request,{id,document:documentData,items});modal.close();await syncAll();
