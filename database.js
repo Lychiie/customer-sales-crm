@@ -268,6 +268,14 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>à
   };
   const syncAll = async () => {
     await loadOrganization();
+    window.DocumentDelete?.configure(request,orgId,async kind=>{
+      if(kind==='cash_bill')await syncCashBills();
+      else if(kind==='delivery_note'){
+        quotationDeliveryNotes=await window.QuotationDelivery.loadLinked(request,orgId);
+        await window.DeliveryNotes.load(request,orgId);
+        render();renderDocumentActions();
+      }else await refreshTaxInvoiceViews();
+    });
     // Catalog failures or long downloads must never block document pages.
     ensureProducts().catch(()=>{});
     await window.Members.configure(request,orgId,session.user.id);
