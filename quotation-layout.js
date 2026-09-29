@@ -173,7 +173,7 @@
     }
     const extraNote=String(details.notes||'').trim();
     const noteText=billing?'':cash?extraNote:[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
-    const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
+    const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],...(Number(doc.vat_amount||0)>0?[['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount]]:[]),['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
     if(!billing){
       let notes=noteText?wrap(noteText,590,16,false,measure):[],continued=false;
       const standardLines=cash?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
