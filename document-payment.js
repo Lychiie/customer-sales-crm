@@ -42,7 +42,7 @@
         const saved=await save(request,org,id,kind,previous,paid);show(saved.payment_received);control.dataset.paymentStatus=saved.status;message.textContent='บันทึกแล้ว';control.disabled=false;onUpdated();
       }catch(error){
         if(error.current){show(error.current.payment_received);control.dataset.paymentStatus=error.current.status;control.disabled=error.current.status==='cancelled';if(control.disabled)label.textContent='ยกเลิก';message.textContent=`บันทึกไม่สำเร็จ: ${error.message}`;onUpdated();}
-        else{control.checked=previous;label.textContent='ยังยืนยันสถานะไม่ได้';message.textContent='กรุณารีเฟรชหน้าเว็บเพื่อตรวจสถานะล่าสุด';}
+        else{control.checked=previous;control.disabled=false;label.textContent='ยังบันทึกสถานะไม่ได้';message.textContent='บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง';}
       }finally{pending.delete(key);}
     });
   };
