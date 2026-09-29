@@ -47,7 +47,9 @@
     return body ? JSON.parse(body) : null;
   };
   const button = document.createElement('button'); button.className = 'ghost'; document.querySelector('.header-actions').prepend(button);
-  const label = () => { button.textContent = session ? '● ฐานข้อมูลเชื่อมแล้ว' : 'เข้าสู่ระบบ'; }; label();
+  let initialLoading=Boolean(session);
+  const label = () => { button.textContent = initialLoading ? 'กำลังเชื่อมต่อข้อมูล…' : session ? '● ฐานข้อมูลเชื่อมแล้ว' : 'เข้าสู่ระบบ'; }; label();
+
   const loadOrganization = async () => {
     const memberships = await request(`/rest/v1/organization_members?user_id=eq.${session.user.id}&select=organization_id`);
     if (!memberships.length) throw new Error('บัญชีนี้ยังไม่มีสิทธิ์องค์กร CRM');
@@ -88,6 +90,27 @@
   const showProductDeleteNotice=(message,undo=false)=>{
     productDeleteNotice.replaceChildren(document.createTextNode(message));
     if(undo){const button=document.createElement('button');button.type='button';button.className='ghost';button.dataset.undoProductDelete='';button.textContent='เลิกทำ';button.style.marginLeft='12px';productDeleteNotice.append(button);}
+  };
+  let catalogLoad=null,catalogLoadOrg=null,catalogReadyOrg=null;
+  const ensureProducts=()=>{
+    if(catalogReadyOrg===orgId)return Promise.resolve();
+    if(catalogLoad&&catalogLoadOrg===orgId)return catalogLoad;
+    const targetOrg=orgId;catalogLoadOrg=targetOrg;
+    showProductDeleteNotice('กำลังโหลดสินค้าและขนาด… ระหว่างนี้ใช้งานหน้าเอกสารอื่นได้');
+    const task=syncProducts().then(()=>{
+      if(orgId!==targetOrg)throw Error('องค์กรเปลี่ยน กรุณาเปิดรายการใหม่');
+      catalogReadyOrg=targetOrg;
+      document.querySelector('#product-search').dispatchEvent(new Event('input'));
+      showProductDeleteNotice(`โหลดสินค้าและขนาดครบ ${state.products.length.toLocaleString('th-TH')} รายการ`);
+    }).catch(error=>{
+      if(orgId===targetOrg){
+        showProductDeleteNotice('โหลดสินค้าไม่สำเร็จ: '+error.message);
+        const retry=document.createElement('button');retry.type='button';retry.className='ghost';retry.textContent='ลองโหลดสินค้าอีกครั้ง';
+        retry.onclick=()=>ensureProducts().catch(()=>{});productDeleteNotice.append(retry);
+      }
+      throw error;
+    }).finally(()=>{if(catalogLoad===task){catalogLoad=null;catalogLoadOrg=null;}});
+    catalogLoad=task;return task;
   };
   document.addEventListener('click',async event=>{
     const remove=event.target.closest('[data-delete-product]'),undo=event.target.closest('[data-undo-product-delete]');
@@ -210,7 +233,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       if(!session||!orgId)return login();
       createButton.disabled=true;
       try{
-        await syncAll();
+        await syncAll();await ensureProducts();
         window.TaxInvoiceCreate.open({request,org:orgId,user:session.user.id,customers:state.customers,products:state.products,
           quotes:state.quotations,links:quotationTaxInvoices,vatRate:companyVatRate,
           onSaved:async result=>{
@@ -245,8 +268,11 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   };
   const syncAll = async () => {
     await loadOrganization();
+    // Catalog failures or long downloads must never block document pages.
+    ensureProducts().catch(()=>{});
     await window.Members.configure(request,orgId,session.user.id);
-    await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
+    await window.TaxInvoiceControl.configure(request,orgId,refreshTaxInvoiceViews);
+    await Promise.all([syncCustomers(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
       window.QuotationDelivery.loadLinked(request, orgId).then(links => { quotationDeliveryNotes = links; })]);
     await syncCashBills();
     state.quotations.forEach(quote => {
@@ -254,7 +280,6 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
     });
     separateTaxInvoices(); render(); renderDocumentActions();
-    await window.TaxInvoiceControl.configure(request,orgId,refreshTaxInvoiceViews);
     await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]);
   };
   const login = () => window.CRMAuth.login();
@@ -266,7 +291,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
     if (type === 'cash_bill') {
-      if (session) await syncAll();
+      if (session) {await syncAll();await ensureProducts();}
       if (!session || !orgId) return login();
       quotationEditor=window.QuotationEditor.mount(document.querySelector('#modal-content'),state.customers,state.products,{vatRate:0,kind:'cash_bill'});
       modal.dataset.type='cash_bill';modal.showModal();return;
@@ -274,7 +299,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     if (type !== 'quotation') return baseOpenForm(type);
     // A browser can restore its local preview before the database requests
     // finish. Refresh first so option values always carry real database IDs.
-    if (session) await syncAll();
+    if (session) {await syncAll();await ensureProducts();}
     if (!session || !orgId) return login();
     pendingQuotation = null;
     quotationEditor = window.QuotationEditor.mount(document.querySelector('#modal-content'), state.customers, state.products);
@@ -575,9 +600,23 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       });
     }catch(error){alert(error.message);}finally{openingDelivery.delete(id);addPrintButtons();}
   });
-  if (session) syncAll().catch(error => {
-    if(error.status===401){session=null;localStorage.removeItem('flowbill-session');localStorage.removeItem('flowbill-org-id');login();}
-    else {label();alert('โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชเพื่อลองใหม่');}
-  });
-  if (['#quotations', '#settings', '#company-profile', '#tax-invoices', '#tax-invoice-control', '#tax-invoice-trash', '#delivery-notes', '#cash-bills', '#purchase-tax', '#sales-tax'].includes(location.hash)) setTimeout(() => window.go?.(location.hash.slice(1)), 0);
+  if(session){
+    // Do not show cached demo rows or an incorrect sign-in message while loading.
+    state.products=[];state.customers=[];state.quotations=[];render();
+    document.querySelectorAll('.page p').forEach(p=>{if(/เข้าสู่ระบบ/.test(p.textContent)){p.textContent='กำลังโหลดข้อมูล…';p.setAttribute('role','status');}});
+    const startupNotice=document.createElement('div');startupNotice.setAttribute('role','status');startupNotice.style.cssText='padding:12px 16px;margin-bottom:16px;background:#eef7f6;border-radius:10px;color:#245f5c';
+    document.querySelector('main').prepend(startupNotice);
+    let starting=false;
+    const start=async()=>{
+      if(starting)return;starting=true;initialLoading=true;label();startupNotice.hidden=false;startupNotice.textContent='กำลังโหลดข้อมูลเอกสาร… สินค้าจะโหลดแยกต่างหาก';
+      try{await syncAll();startupNotice.hidden=true;}
+      catch(error){
+        if(error.status===401){session=null;localStorage.removeItem('flowbill-session');localStorage.removeItem('flowbill-org-id');login();}
+        else{startupNotice.textContent='โหลดข้อมูลเอกสารไม่สำเร็จ: '+error.message+' ';const retry=document.createElement('button');retry.type='button';retry.className='ghost';retry.textContent='ลองใหม่';retry.onclick=start;startupNotice.append(retry);}
+      }finally{starting=false;initialLoading=false;label();}
+    };
+    start();
+  }
+  const initialPage=location.hash.slice(1);
+  if(pageMeta[initialPage]&&document.getElementById(initialPage))setTimeout(()=>window.go?.(initialPage),0);
 })();
