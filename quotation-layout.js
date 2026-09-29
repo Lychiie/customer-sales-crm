@@ -38,6 +38,7 @@
   ];
   const build=(company,doc,items,measure,logo=null)=>{
     const billing=doc.kind==='billing_note',cash=doc.kind==='cash_bill';
+    if(cash){const net=Math.round((Number(doc.subtotal)-Number(doc.discount_amount||0))*100)/100;doc={...doc,vat_rate:0,vat_amount:0,taxable_amount:net,grand_total:net};}
     const INK=billing?'#65516f':'#245b57',LINE=billing?'#d8cedd':'#c5d6d3',MUTED=billing?'#776b7f':'#526d69',HEADER=billing?'#f3eef5':'#edf5f3';
     const title=billing?'ใบวางบิล':cash?'บิลเงินสด':'ใบเสนอราคา',english=billing?'BILLING NOTE':cash?'CASH BILL':'QUOTATION';
     if(billing&&items.some(item=>item.kind!=='tax_invoice'||!item.document_number||item.grand_total==null||!Number.isFinite(Number(item.grand_total))||Number(item.grand_total)<0))throw Error('รายการใบวางบิลต้องเชื่อมกับใบกำกับภาษีที่ออกแล้ว');
@@ -173,7 +174,7 @@
     }
     const extraNote=String(details.notes||'').trim();
     const noteText=billing?'':cash?extraNote:[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
-    const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],...(Number(doc.vat_amount||0)>0?[['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount]]:[]),['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
+    const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
     if(!billing){
       let notes=noteText?wrap(noteText,590,16,false,measure):[],continued=false;
       const standardLines=cash?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
@@ -194,7 +195,7 @@
       notes.forEach((value,i)=>text(value,L,sectionY+39+i*25,16));
       const productionY=sectionY+39+notes.length*25+18;
       if(!cash){text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));}
-      const leftHeight=cash?39+notes.length*25:productionY-sectionY+39+standardLines.length*25;
+      const leftHeight=cash?Math.max(180,39+notes.length*25):productionY-sectionY+39+standardLines.length*25;
       const amountHeight=Math.max(amounts.length*45,leftHeight),amountRowHeight=amountHeight/amounts.length;
       amounts.forEach(([label,value],i)=>{const yy=sectionY+i*amountRowHeight,last=i===amounts.length-1,labelY=yy+(amountRowHeight-18)/2,valueY=yy+(amountRowHeight-19)/2;rect(713,yy,444,amountRowHeight,last?INK:'#ffffff');text(label,733,labelY,18,last,'left',last?'#ffffff':INK);text(money(value),1137,valueY,19,true,'right',last?'#ffffff':INK);});
       y=sectionY+amountHeight+28;
