@@ -59,6 +59,21 @@
     const rows = await request(`/rest/v1/customers?organization_id=eq.${orgId}&select=*&order=created_at.desc`);
     state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
+  // A new tax invoice only needs the SKU being entered, not the full catalog.
+  const lookupProductCodes=async(value,targetOrg=orgId)=>{
+    const q=String(value??'').trim().toUpperCase();
+    if(!session||!targetOrg||orgId!==targetOrg)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
+    if(!q)return [];
+    if(q.length>100||!/^[A-Z0-9_-]+$/.test(q))throw Error('รหัสสินค้าใช้ตัวอักษรอังกฤษ ตัวเลข ขีดกลาง หรือขีดล่าง');
+    const pattern=q.replace(/_/g,'\\_')+'*';
+    const rows=await request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(targetOrg)+'&is_active=eq.true&product.is_active=eq.true&sku=ilike.'+encodeURIComponent(pattern)+'&order=sku.asc&limit=8');
+    if(orgId!==targetOrg)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
+    if(!Array.isArray(rows))throw Error('โหลดสินค้าไม่สำเร็จ');
+    return rows.map(variant=>{
+      const p=variant.product,price=(variant.variant_prices||[]).sort((a,b)=>String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price??0;
+      return {id:variant.id,productId:p.id,sku:variant.sku,name:p.name,unit:p.unit||'ชิ้น',size:variant.label,price:Number(price).toFixed(2),status:p.is_active?'ใช้งาน':'ปิดใช้งาน',isActive:variant.is_active};
+    });
+  };
   let productTrash=[],productTrashOrg=null;
   const syncProducts = async () => {
     const requestOrg=orgId;
@@ -237,8 +252,9 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       if(!session||!orgId)return login();
       createButton.disabled=true;
       try{
-        await syncAll();await ensureProducts();
-        window.TaxInvoiceCreate.open({request,org:orgId,user:session.user.id,customers:state.customers,products:state.products,
+        const actionOrg=orgId;
+        window.TaxInvoiceCreate.open({request,org:actionOrg,user:session.user.id,customers:state.customers,products:[],
+          lookupProducts:query=>lookupProductCodes(query,actionOrg),
           quotes:state.quotations,links:quotationTaxInvoices,vatRate:companyVatRate,
           onSaved:async result=>{
             try{await syncAll();window.TaxPaymentFilters.showAll();go('tax-invoices');}
