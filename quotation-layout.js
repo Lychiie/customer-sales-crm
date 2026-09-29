@@ -150,7 +150,12 @@
       }
     });
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
-    if(pages.length===1){while(y+32<=(billing?1140:1104)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
+    if(cash){
+      const noteLines=String(details.notes||'').trim()?wrap(String(details.notes).trim(),590,16,false,measure).length:0;
+      const footerHeight=Math.max(180,39+noteLines*25)+28+161;
+      const tableBottom=1630-24-footerHeight;
+      while(y<tableBottom){const rowHeight=Math.min(32,tableBottom-y);widths.forEach((w,i)=>rect(xs[i],y,w,rowHeight));y+=rowHeight;}
+    }else if(pages.length===1){while(y+32<=(billing?1140:1104)){if(billing){y+=32;}else{widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}}}
     y+=24;
     if(billing){
       const account=company.payment_account||{};
@@ -193,7 +198,8 @@
       const standardLines=cash?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
       const fixedLeftHeight=39+18+39+standardLines.length*25;
       while(true){
-        const finalCapacity=Math.floor((1630-y-28-161-fixedLeftHeight)/25);
+        const availableFooterHeight=1630-y-28-161;
+        const finalCapacity=cash?(availableFooterHeight<180?-1:Math.floor((availableFooterHeight-39)/25)):Math.floor((availableFooterHeight-fixedLeftHeight)/25);
         if(finalCapacity>=notes.length)break;
         if(!notes.length){start();y+=20;continue;}
         const pageCapacity=Math.floor((1600-y-39)/25);
