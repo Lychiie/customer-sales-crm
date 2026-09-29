@@ -1,6 +1,6 @@
 (() => {
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const supported=kind=>['billing_note','tax_invoice'].includes(kind);
+  const supported=kind=>['billing_note','tax_invoice','cash_bill'].includes(kind);
   const render=doc=>{
     if(doc.status==='cancelled')return '<span class="payment-cancelled">ยกเลิก</span>';
     const paid=doc.payment_received===true;
