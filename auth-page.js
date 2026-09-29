@@ -1,6 +1,13 @@
 (() => {
   const pages=new Set(['dashboard','quotations','invoices','tax-invoices','tax-invoice-control','tax-invoice-trash','delivery-notes','cash-bills','company-profile','customers','products','purchase-tax','sales-tax','settings','members']);
   const safePage=value=>pages.has(value)?value:'dashboard';
+  // Local copies must use the live site's own session, never a separate file:// session.
+  if(location.protocol==='file:'){
+    const next=safePage(location.hash.slice(1)||new URLSearchParams(location.search).get('next'));
+    const route=document.documentElement.dataset.loginPage==='true'?'login.html?next='+encodeURIComponent(next):'index.html#'+next;
+    location.replace('https://lychiie.github.io/customer-sales-crm/'+route);
+    return;
+  }
   const loginUrl=()=>new URL('login.html?next='+encodeURIComponent(safePage(location.hash.slice(1))),location.href).href;
   window.CRMAuth={safePage,login:()=>location.assign(loginUrl())};
   if(document.documentElement.dataset.loginPage!=='true'){
