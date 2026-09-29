@@ -90,7 +90,7 @@
       }
       // Keep the issuer in one aligned block beside a proportionate logo.
       // Its width ends before the document heading, even for long addresses.
-      const nameX=(cash||logo)?L+146:L,nameWidth=641-(nameX-L);
+      const nameX=cash?L+138:logo?L+146:L,nameWidth=641-(nameX-L);
       const logoHeight=cash?112:logo?Math.min(120,120*logo.height/logo.width):0;
       const logoWidth=cash?112:logo?logoHeight*logo.width/logo.height:0;
       if(cash){
@@ -98,10 +98,18 @@
         text('BY',L+60,101,52,true,'center','#ffffff');
         line(L+32,169,L+88,169,'#9fd1c5',4);
       }else if(logo)page.push({type:'image',image:logo.image,href:logo.href,x:L+(120-logoWidth)/2,y:78,w:logoWidth,h:logoHeight});
-      let cy=cash?99:78;
-      if(!cash)cy+=block(company.name||'-',nameX,cy,nameWidth,26,true)+14;
-      cy+=block(window.DocumentAddress.format(company.address)||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
-      if(!cash)cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),nameX,cy,nameWidth,16,false,MUTED);
+      let cy=78;
+      if(cash){
+        const addressLines=wrap(window.DocumentAddress.format(company.address)||'-',nameWidth,22,false,measure);
+        const addressHeight=(addressLines.length-1)*34+22;
+        const addressY=78+Math.max(0,(logoHeight-addressHeight)/2);
+        addressLines.forEach((value,i)=>text(value,nameX,addressY+i*34,22,false,'left',INK));
+        cy=addressY+addressHeight;
+      }else{
+        cy+=block(company.name||'-',nameX,cy,nameWidth,26,true)+14;
+        cy+=block(window.DocumentAddress.format(company.address)||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
+        cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),nameX,cy,nameWidth,16,false,MUTED);
+      }
       cy=Math.max(cy,78+logoHeight);
       text(title,R,76,39,true,'right');text(english,R,128,17,false,'right',MUTED);
       const no=wrap(doc.document_number||'ตัวอย่าง',345,19,true,measure);
