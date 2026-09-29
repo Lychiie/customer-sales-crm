@@ -77,8 +77,16 @@
     const thaiDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
     state.quotations = rows.map((quote) => ({ id: quote.id, no: quote.document_number, customer: quote.customer_name_snapshot, date: thaiDate(quote.issue_date), expires: thaiDate(quote.valid_until), total: `฿ ${Number(quote.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, statusCode: quote.status, status: status[quote.status] || quote.status }));
   };
+  const syncCashBills = async () => {
+    const rows = await request(`/rest/v1/documents?organization_id=eq.${orgId}&kind=eq.cash_bill&select=id,document_number,customer_name_snapshot,issue_date,grand_total,status,payment_received,deleted_at&order=created_at.desc`);
+    const bills=rows.filter(row=>!row.deleted_at),page=document.querySelector('#cash-bills');
+    page.innerHTML=`<div class="page-toolbar"><h2>บิลเงินสด</h2><button type="button" class="primary" data-new-cash-bill>+ สร้างบิลเงินสด</button></div><p>บิลรูปแบบเดียวกับเอกสารขายอื่น ๆ พร้อมโลโก้บริษัท รายการสินค้า ภาษีมูลค่าเพิ่ม และพิมพ์ / PDF</p><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>วันที่ออกบิล</th><th>ยอดรวม</th><th>สถานะชำระเงิน</th><th>เอกสาร</th></tr></thead><tbody>${bills.length?bills.map(b=>`<tr><td><strong>${escapeHtml(b.document_number)}</strong></td><td>${escapeHtml(b.customer_name_snapshot)}</td><td>${thaiDate(b.issue_date)}</td><td>฿ ${Number(b.grand_total).toLocaleString('th-TH',{minimumFractionDigits:2})}</td><td>${window.DocumentPayment.render(b)}</td><td><button type="button" class="ghost" data-print-document="${escapeHtml(b.document_number)}">ดู / พิมพ์</button></td></tr>`).join(''):'<tr><td colspan="6">ยังไม่มีบิลเงินสด กด “สร้างบิลเงินสด” เพื่อเริ่มออกเอกสาร</td></tr>'}</tbody></table></article>`;
+    page.querySelector('[data-new-cash-bill]').onclick=()=>window.openForm('cash_bill');
+  };
+  const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const thaiDate=value=>value?new Date(`${value}T00:00:00`).toLocaleDateString('th-TH'):'—';
   const syncBillingNotes = async () => {
-        const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,issue_date,due_date,grand_total,status,payment_received,kind,source_document_id,deleted_at&order=created_at.desc`);
+    const documents = await request(`/rest/v1/documents?organization_id=eq.${orgId}&select=id,document_number,customer_name_snapshot,issue_date,due_date,grand_total,status,payment_received,kind,source_document_id,deleted_at&order=created_at.desc`);
     quotationTaxInvoices = window.QuotationTax.linkedInvoices(documents.filter((document) => !document.deleted_at));
     const rows = documents.filter((document) => document.kind === 'billing_note' && !document.deleted_at);
     const taxInvoices = documents.filter((document) => document.kind === 'tax_invoice' && !document.deleted_at);
@@ -138,6 +146,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     await window.Members.configure(request,orgId,session.user.id);
     await Promise.all([syncCustomers(), syncProducts(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
       window.QuotationDelivery.loadLinked(request, orgId).then(links => { quotationDeliveryNotes = links; })]);
+    await syncCashBills();
     state.quotations.forEach(quote => {
       quote.taxInvoiceNumber = quotationTaxInvoices.get(quote.id)?.document_number || null;
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
@@ -154,6 +163,12 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   let quotationEditor, pendingQuotation, savingQuotation = false;
   modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
+    if (type === 'cash_bill') {
+      if (session) await syncAll();
+      if (!session || !orgId) return login();
+      quotationEditor=window.QuotationEditor.mount(document.querySelector('#modal-content'),state.customers,state.products,{vatRate:companyVatRate,kind:'cash_bill'});
+      modal.dataset.type='cash_bill';modal.showModal();return;
+    }
     if (type !== 'quotation') return baseOpenForm(type);
     // A browser can restore its local preview before the database requests
     // finish. Refresh first so option values always carry real database IDs.
@@ -270,7 +285,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     finally {deletingQuotations.delete(id);controls.forEach(control=>control.disabled=false);action.textContent='ลบ';}
   });
   document.querySelector('#modal-form').addEventListener('submit', async (event) => {
-    if (event.submitter?.value === 'cancel' || !['login', 'customer', 'product', 'quotation'].includes(modal.dataset.type)) return;
+    if (event.submitter?.value === 'cancel' || !['login', 'customer', 'product', 'quotation','cash_bill'].includes(modal.dataset.type)) return;
     // The original prototype stores the row locally and closes this dialog.
     // Handle database-backed forms first, so the screen only changes after
     // Supabase has confirmed that the record was saved.
@@ -288,6 +303,13 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
         controls.forEach(c=>c.disabled=true);
         try {await addQuotation(data);} finally {savingQuotation=false;controls.forEach(c=>c.disabled=false);}
       }
+      else if(modal.dataset.type==='cash_bill'&&session&&orgId){
+        const customer=state.customers.find(item=>item.id===data.customerId);if(!customer)throw new Error('กรุณาเลือกลูกค้า');
+        const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,state.products,companyVatRate);
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(data.issueDate||''))throw new Error('กรุณาระบุวันที่ออกบิล');
+        const id=crypto.randomUUID(),documentData={id,organization_id:orgId,kind:'cash_bill',document_number:`CB-${id.slice(0,8).toUpperCase()}`,status:'paid',payment_received:true,customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:data.issueDate,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms||'เงินสด',notes:data.notes||'',rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id};
+        await window.QuotationEditor.persist(request,{id,document:documentData,items});modal.close();await syncAll();
+      }
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
   }, true);
   const escapePrint = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -304,7 +326,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     const e = escapePrint;
     const money = (value) => Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH') : '-';
-    const title = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน' }[doc.kind] || 'เอกสาร';
+    const title = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน', cash_bill: 'บิลเงินสด' }[doc.kind] || 'เอกสาร';
     document.querySelector('#document-preview')?.remove();
     const preview = document.createElement('section');
     preview.id = 'document-preview';
@@ -329,7 +351,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     </style><div class="print-tools"><button type="button" data-print-now>พิมพ์ / บันทึก PDF</button><button type="button" data-print-close>กลับไปยังรายการ</button><span>เลือก Save as PDF หรือ บันทึกเป็น PDF ในหน้าพิมพ์</span></div>
     <article class="paper"><header class="print-head"><div><div class="print-brand"><img class="print-company-logo" src="company-logo.png" alt="โลโก้บริษัท"><h2>${e(company.name)}</h2></div><div class="address">${e(window.DocumentAddress.format(company.address) || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p></div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
     <div class="address"><strong>ลูกค้า: ${e(doc.customer_name_snapshot)}</strong><br>${e(window.DocumentAddress.format(doc.customer_address_snapshot) || '-')}<br>เลขประจำตัวผู้เสียภาษี ${e(doc.customer_tax_id_snapshot || '-')}</div>
-    ${doc.valid_until ? `<p>ยืนราคาถึง ${e(date(doc.valid_until))}</p>` : ''}${doc.due_date ? `<p>กำหนดชำระ ${e(date(doc.due_date))}</p>` : ''}
+    ${doc.valid_until ? `<p>ยืนราคาถึง ${e(date(doc.valid_until))}</p>` : ''}${doc.due_date ? `<p>กำหนดชำระ ${e(date(doc.due_date))}</p>` : ''}${doc.kind==='cash_bill'?`<p><strong>เงื่อนไขชำระเงิน:</strong> ${e(window.QuotationEditor.decode(doc.notes).paymentTerms||'เงินสด')}</p>`:''}
     <table><thead><tr><th style="width:7%">ลำดับ</th><th style="width:39%">สินค้า / ขนาด</th><th style="width:14%">จำนวน</th><th class="number" style="width:20%">ราคาต่อหน่วย</th><th class="number" style="width:20%">รวม</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td><td class="item-description">${e([item.product_name_snapshot,item.specification_snapshot,item.sku_snapshot].filter(value => value != null && String(value).trim()).join(' '))}</td><td>${e(item.quantity)} ${e(item.unit_snapshot)}</td><td class="number">${money(item.unit_price)}</td><td class="number">${money(item.line_total)}</td></tr>`).join('')}</tbody></table>
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>
     <div class="signatures"><p>ผู้จัดทำ / ผู้รับเงิน<br><br>วันที่ __________________</p><p>ลูกค้า / ผู้รับเอกสาร<br><br>วันที่ __________________</p></div></article>`;
@@ -414,7 +436,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(?:(?:QT|BL|TI)-|(?:QT|BL)\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
+      if (!/^(?:(?:QT|BL|TI|CB)-|(?:QT|BL|CB)\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';
