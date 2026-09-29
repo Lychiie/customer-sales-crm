@@ -211,3 +211,28 @@
   window.BillingLayout={billingDueDate,build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'ใบวางบิล')};
   window.CashBillLayout={build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'บิลเงินสด')};
 })();
+
+
+// Add the approved receiving account details to cash bill printouts.
+(() => {
+  const prepare = window.CashBillLayout.prepare;
+  const addReceivingAccounts = (pages, doc) => {
+    if (doc?.kind !== 'cash_bill' || !pages?.length) return pages;
+    const page = pages[pages.length - 1];
+    const total = page.find(command => command.type === 'rect' && command.x === 713 && command.w === 444);
+    if (!total) return pages;
+    const x = 83, y = total.y;
+    const lines = [
+      'ชื่อบัญชี  นางสาวเบญจมาศ สุภาษี',
+      'ธนาคารกสิกรไทย  เลขที่ 014-8-15927-0',
+      'ธนาคารกรุงเทพ  เลขที่ 030-7-231852',
+      'ธนาคารเกียรตินาคิน  เลขที่ 208-4-77636-5'
+    ];
+    page.push({type:'text',s:'ช่องทางการชำระเงิน',x,y:y+17,size:17,bold:true,align:'left',color:'#245b57'});
+    lines.forEach((s,i)=>page.push({type:'text',s,x,y:y+44+i*25,size:16,bold:false,align:'left',color:'#245b57'}));
+    return pages;
+  };
+  window.CashBillLayout.prepare = async (...args) => addReceivingAccounts(await prepare(...args), args[1]);
+  const build = window.CashBillLayout.build;
+  window.CashBillLayout.build = (...args) => addReceivingAccounts(build(...args), args[1]);
+})();
