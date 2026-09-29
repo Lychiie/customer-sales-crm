@@ -61,13 +61,13 @@
     dialog.addEventListener('cancel',event=>{if(saving)event.preventDefault();else dialog.remove();});
     form.onsubmit=async event=>{
       event.preventDefault();if(saving || !form.reportValidity())return;
-      saving=true;dialog.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=true);dialog.querySelector('[role=status]').textContent='กำลังบันทึก…';
+      saving=true;form.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=true);dialog.querySelector('[role=status]').textContent='กำลังบันทึก…';
       try{
         const result=await issue(request,org,quote,{date:form.elements.date.value,shipping:form.elements.shipping.value,notes:form.elements.notes.value});
         dialog.remove();
         try{await onSaved(result);}catch{alert(`บันทึกใบส่งสินค้า ${result.document_number} แล้ว แต่เปิดตัวอย่างไม่ได้ กรุณาเปิดจากเมนูใบส่งสินค้า`);}
       }catch(error){dialog.querySelector('[role=status]').textContent=error.message;}
-      finally{saving=false;dialog.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=false);}
+      finally{saving=false;form.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=false);}
     };
     document.body.append(dialog);dialog.showModal();
   };
