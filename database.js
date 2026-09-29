@@ -63,19 +63,23 @@
   const syncProducts = async () => {
     const requestOrg=orgId;
     // Page variants directly: embedded variants are capped per product by the API.
-    const rows=[],pageSize=500;
-    for(let offset=0;;offset+=pageSize){
-      const page=await request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(requestOrg)+'&order=id.asc&limit='+pageSize+'&offset='+offset);
+    const rows=[],pageSize=500,concurrency=4;
+    for(let offset=0;;offset+=pageSize*concurrency){
+      const pages=await Promise.all(Array.from({length:concurrency},(_,index)=>
+        request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(requestOrg)+'&order=id.asc&limit='+pageSize+'&offset='+(offset+index*pageSize))));
       if(orgId!==requestOrg)return;
-      if(!Array.isArray(page))throw Error('โหลดรายการสินค้าไม่สำเร็จ');
-      rows.push(...page);
-      if(page.length<pageSize)break;
+      if(pages.some(page=>!Array.isArray(page)))throw Error('โหลดรายการสินค้าไม่สำเร็จ');
+      let complete=false;
+      for(const page of pages){rows.push(...page);if(page.length<pageSize){complete=true;break;}}
+      showProductDeleteNotice('กำลังโหลดสินค้า '+rows.length.toLocaleString('th-TH')+' รายการ… ใช้งานหน้าอื่นได้ระหว่างรอ');
+      if(complete)break;
     }
+    const compareSku=new Intl.Collator(undefined,{numeric:true}).compare;
     const products=rows.map(variant=>{
       const product=variant.product;
       const price=(variant.variant_prices||[]).sort((a,b)=>String(b.starts_on).localeCompare(String(a.starts_on)))[0]?.price??0;
       return {id:variant.id,productId:product.id,sku:variant.sku||product.code,name:product.name,unit:product.unit||'ชิ้น',size:variant.label,price:Number(price).toFixed(2),status:product.is_active?'ใช้งาน':'ปิดใช้งาน',isActive:variant.is_active};
-    }).sort((a,b)=>a.sku.localeCompare(b.sku,undefined,{numeric:true}));
+    }).sort((a,b)=>compareSku(a.sku,b.sku));
     state.products=products.filter(product=>product.isActive);
     productTrash=products.filter(product=>!product.isActive);productTrashOrg=requestOrg;
     renderProductTrash();
@@ -266,6 +270,11 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     renderDocumentActions();
     await window.TaxRegisters.load(request,orgId);
   };
+  let productsOrganizationReady=false;
+  const loadVisibleProducts=()=>{
+    if(session&&productsOrganizationReady&&document.querySelector('#products').classList.contains('active-page'))ensureProducts().catch(()=>{});
+  };
+  new MutationObserver(loadVisibleProducts).observe(document.querySelector('#products'),{attributes:true,attributeFilter:['class']});
   const syncAll = async () => {
     await loadOrganization();
     window.CompanyDashboard?.configure(request,orgId);
@@ -280,8 +289,9 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
         render();renderDocumentActions();
       }else await refreshTaxInvoiceViews();
     });
-    // Catalog failures or long downloads must never block document pages.
-    ensureProducts().catch(()=>{});
+    // Only the catalog page or a product editor requests the full catalog.
+    productsOrganizationReady=true;
+    loadVisibleProducts();
     await window.Members.configure(request,orgId,session.user.id);
     await window.TaxInvoiceControl.configure(request,orgId,refreshTaxInvoiceViews);
     await Promise.all([syncCustomers(), syncQuotations(), syncBillingNotes(), syncCompanyProfile(),
@@ -620,7 +630,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     document.querySelector('main').prepend(startupNotice);
     let starting=false;
     const start=async()=>{
-      if(starting)return;starting=true;initialLoading=true;label();startupNotice.hidden=false;startupNotice.textContent='กำลังโหลดข้อมูลเอกสาร… สินค้าจะโหลดแยกต่างหาก';
+      if(starting)return;starting=true;initialLoading=true;label();startupNotice.hidden=false;startupNotice.textContent='กำลังโหลดข้อมูลเอกสาร… สินค้าจะโหลดเมื่อเปิดใช้งาน';
       try{await syncAll();startupNotice.hidden=true;}
       catch(error){
         if(error.status===401){session=null;localStorage.removeItem('flowbill-session');localStorage.removeItem('flowbill-org-id');login();}
