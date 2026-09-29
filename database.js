@@ -182,7 +182,7 @@
     }finally{productDeleteBusy=false;renderProductTrash();}
   });
   const syncCompanyProfile = async () => {
-    const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,vat_rate&limit=1`))[0];
+    const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,phone,vat_rate&limit=1`))[0];
     if (!organization) return;
     companyVatRate=Number(organization.vat_rate ?? 7);
     const settings = document.querySelector('#company-profile');
