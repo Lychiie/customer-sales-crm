@@ -235,6 +235,14 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     if (['ร่าง','รออนุมัติ'].includes(quote.status)) cell.innerHTML = `<button class="ghost" data-approve="${quote.no}">อนุมัติ</button>`;
     // Billing creation is intentionally not offered in the quotation list.
   });
+  // Refresh invoice views after trash actions without reloading the product catalog.
+  const refreshTaxInvoiceViews = async () => {
+    await window.TaxInvoiceControl.invalidate();
+    await syncBillingNotes();
+    separateTaxInvoices();
+    renderDocumentActions();
+    await window.TaxRegisters.load(request,orgId);
+  };
   const syncAll = async () => {
     await loadOrganization();
     await window.Members.configure(request,orgId,session.user.id);
@@ -246,7 +254,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       if (quote.statusCode === 'approved') quote.status = quote.taxInvoiceNumber ? 'ออกใบกำกับภาษีแล้ว' : 'รอออกใบกำกับภาษี';
     });
     separateTaxInvoices(); render(); renderDocumentActions();
-    await window.TaxInvoiceControl.configure(request,orgId,syncAll);
+    await window.TaxInvoiceControl.configure(request,orgId,refreshTaxInvoiceViews);
     await Promise.all([window.DeliveryNotes.load(request, orgId), window.TaxRegisters.load(request, orgId)]);
   };
   const login = () => window.CRMAuth.login();
