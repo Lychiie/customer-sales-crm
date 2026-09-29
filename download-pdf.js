@@ -5,7 +5,7 @@ window.buildSalesPDF = async (company, doc, items) => {
   let canvas, ctx, y, companyLogo;
   const width = 1240, height = 1754, margin = 90;
   const money = value => Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const titles = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน' };
+  const titles = { quotation: 'ใบเสนอราคา', billing_note: 'ใบวางบิล', tax_invoice: 'ใบกำกับภาษี / ใบเสร็จรับเงิน', cash_bill: 'บิลเงินสด' };
   const newPage = () => {
     canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
@@ -64,6 +64,11 @@ window.buildSalesPDF = async (company, doc, items) => {
   text(`มูลค่าก่อน VAT: ${money(doc.taxable_amount)} บาท`);
   text(`VAT ${doc.vat_rate}%: ${money(doc.vat_amount)} บาท`);
   text(`ยอดสุทธิ: ${money(doc.grand_total)} บาท`, 30, true);
+  if (doc.kind === 'cash_bill') {
+    const details=window.QuotationEditor?.decode(doc.notes);
+    if(details?.paymentTerms)text(`เงื่อนไขชำระเงิน: ${details.paymentTerms}`);
+    if(details?.notes)text(`หมายเหตุ: ${details.notes}`);
+  }
   y += 55; text('ผู้จัดทำ / ผู้รับเงิน ____________________    ผู้รับเอกสาร ____________________', 22);
   }
   const encoder = new TextEncoder(), chunks = [], offsets = [0]; let length = 0;
