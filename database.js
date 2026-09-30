@@ -39,6 +39,7 @@
   let companyVatRate = 7;
   const headers = () => ({ apikey: config.publishableKey, Authorization: `Bearer ${session?.access_token || config.publishableKey}`, 'Content-Type': 'application/json' });
   const request = async (path, options = {}) => {
+    ({path,options}=window.PermissionTransport.route(path,options,orgId));
     const {responseType,...fetchOptions}=options;
     const response = await fetch(config.url + path, { ...fetchOptions, headers: { ...headers(), ...(options.headers || {}) } });
     if(response.ok&&responseType==='blob')return response.blob();
@@ -49,7 +50,6 @@
   const button = document.createElement('button'); button.className = 'ghost'; document.querySelector('.header-actions').prepend(button);
   let initialLoading=Boolean(session);
   const label = () => { button.textContent = initialLoading ? 'กำลังเชื่อมต่อข้อมูล…' : session ? '● ฐานข้อมูลเชื่อมแล้ว' : 'เข้าสู่ระบบ'; }; label();
-
   const loadOrganization = async () => {
     const memberships = await request(`/rest/v1/organization_members?user_id=eq.${session.user.id}&select=organization_id`);
     if (!memberships.length) throw new Error('บัญชีนี้ยังไม่มีสิทธิ์องค์กร CRM');
@@ -162,7 +162,6 @@
     }catch(error){showProductDeleteNotice('บันทึกไม่สำเร็จ: '+error.message,Boolean(lastDeletedProduct&&lastDeletedProduct.org===orgId));}
     finally{productDeleteBusy=false;if((remove||undo).isConnected)(remove||undo).disabled=false;}
   });
-
   const productTrashButton=document.createElement('button');
   productTrashButton.type='button';productTrashButton.className='ghost';productTrashButton.textContent='ถังขยะ (0)';productTrashButton.style.marginLeft='auto';
   document.querySelector('#add-product').before(productTrashButton);
@@ -300,6 +299,11 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   new MutationObserver(loadVisibleProducts).observe(document.querySelector('#products'),{attributes:true,attributeFilter:['class']});
   const syncAll = async () => {
     await loadOrganization();
+    await window.CRMAccess.configure(request,orgId);
+    if(window.CRMAccess.role==='customer'){
+      state.customers=[];state.quotations=[];state.invoices=[];
+      productsOrganizationReady=true;render();loadVisibleProducts();return;
+    }
     window.CompanyDashboard?.configure(request,orgId);
     window.ProductCodePicker?.configure(async()=>{await ensureProducts();return state.products;});
     window.TaxInvoiceEdit?.configure(request,orgId,async()=>{await Promise.all([ensureProducts(),syncCustomers()]);return {customers:state.customers,products:state.products};},async()=>{await syncAll();await window.TaxInvoiceControl.invalidate();});
@@ -382,7 +386,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       const number = `QT-${today.replaceAll('-', '')}-${id.slice(0,8).toUpperCase()}`;
       pendingQuotation={inputKey,id,document:{id,organization_id:orgId,kind:'quotation',document_number:number,status:'draft',customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:today,valid_until:data.expires,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms.trim(),deliveryTerms:data.deliveryTerms.trim(),notes:data.notes,rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id},items};
     }
-    // Both requests can be retried after a lost response without creating duplicate rows.
+    // The atomic RPC can be retried after a lost response without duplicate rows.
     const submittedQuotation=pendingQuotation;
     await window.QuotationEditor.persist(request,submittedQuotation);
     if(pendingQuotation===submittedQuotation)pendingQuotation=null;

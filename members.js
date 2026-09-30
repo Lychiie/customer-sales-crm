@@ -18,7 +18,7 @@
     #member-dialog .form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid #e7ebf2}
   `;document.head.append(style);
   let root,nav,context,version=0;
-  const roles={sales:'พนักงานขาย',finance:'พนักงานบัญชี / การเงิน',admin:'ผู้ดูแล'};
+  const roles={employee:'พนักงาน',customer:'ลูกค้า',admin:'ผู้ดูแล'};
   const roleOptions=()=>Object.entries(roles).map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
   const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const invoke=(request,org,data)=>request('/functions/v1/admin-members',{method:'POST',body:JSON.stringify({...data,organization_id:org})});
@@ -46,6 +46,7 @@
     f.querySelector('p').textContent='เลือกสิทธิ์ให้ตรงกับหน้าที่ ผู้ดูแลสามารถจัดการสมาชิกและเข้าถึงไฟล์บริษัทได้ การแก้ไขนี้ไม่เปลี่ยนชื่อผู้ใช้หรือรหัสผ่าน';
     f.querySelector('p').insertAdjacentHTML('beforebegin','<label class="field">สิทธิ์การใช้งาน<select name="role" required><option value="">เลือกสิทธิ์</option>'+roleOptions()+'</select></label>');
     f.elements.role.value=member.role||'';
+    const permissions=window.MemberPermissions.mount(f,member.role,member.permissions);
     f.elements.username.readOnly=false;
     f.elements.username.maxLength=32;
     f.elements.username.insertAdjacentHTML('afterend','<button type="button" class="ghost" data-save-user>บันทึกชื่อผู้ใช้</button>');
@@ -81,7 +82,7 @@
       e.preventDefault();if(busy||!f.reportValidity())return;
       const name=f.elements.display_name.value.trim();if(!name){error.textContent='กรุณาระบุชื่อสมาชิก';return;}
       lock(true);error.textContent='';status.textContent='';
-      try{await invoke(request,org,{action:'update',user_id:member.user_id,display_name:name,role:f.elements.role.value});close();await configure(request,org,context.user);if(context)await load();}
+      try{await invoke(request,org,{action:'update',user_id:member.user_id,display_name:name,role:f.elements.role.value,permissions:permissions.read()});close();await configure(request,org,context.user);if(context)await load();}
       catch(e){error.textContent=e.message;}finally{lock(false);}
     };document.body.append(d);d.showModal();f.elements.display_name.focus();
   };
@@ -91,13 +92,14 @@
 d.innerHTML='<form><h2>สร้างสมาชิก</h2><label class="field">ชื่อสมาชิก<input name="display_name" required maxlength="100" autocomplete="off"></label><label class="field">ชื่อผู้ใช้ (User)<input name="username" required minlength="3" maxlength="32" pattern="[a-zA-Z][a-zA-Z0-9._\\-]{2,31}" autocomplete="off"></label><p>ใช้ภาษาอังกฤษ ตัวเลข จุด ขีด หรือขีดล่าง 3–32 ตัว ขึ้นต้นด้วยตัวอักษร</p><label class="field">รหัสผ่าน (Password)<input name="password" type="password" required minlength="6" maxlength="128" autocomplete="new-password"></label><label class="field">ยืนยันรหัสผ่าน<input name="confirm" type="password" required autocomplete="new-password"></label><label class="field">สิทธิ์<select name="role"><option value="sales">สมาชิกงานขาย</option><option value="admin">ผู้ดูแล — สร้างสมาชิกและเข้าถึงไฟล์บริษัทได้</option></select></label><p>รหัสผ่านอย่างน้อย 6 ตัวอักษร ระบบไม่แสดงรหัสผ่านย้อนหลัง</p><p role="alert"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button class="primary" type="submit">สร้างสมาชิก</button></div></form>';
     const f=d.querySelector('form'),submit=f.querySelector('[type=submit]'),cancel=f.querySelector('[data-cancel]'),error=f.querySelector('[role=alert]');let busy=false;
     f.elements.role.innerHTML=roleOptions();
+    const permissions=window.MemberPermissions.mount(f,'employee',{});
     const close=()=>{f.reset();d.close();d.remove();};cancel.onclick=close;d.oncancel=e=>{e.preventDefault();if(!busy)close();};
     f.onsubmit=async e=>{
       e.preventDefault();if(busy||!f.reportValidity())return;error.textContent='';
       if(f.elements.password.value!==f.elements.confirm.value){error.textContent='รหัสผ่านสองช่องไม่ตรงกัน';return;}
       if(!window.MemberIdentity.valid(f.elements.username.value)){error.textContent='รูปแบบชื่อผู้ใช้ไม่ถูกต้อง';return;}
       busy=true;submit.disabled=cancel.disabled=true;
-      try{await invoke(request,org,{action:'create',username:window.MemberIdentity.username(f.elements.username.value),display_name:f.elements.display_name.value.trim(),password:f.elements.password.value,role:f.elements.role.value});close();await load();}
+      try{await invoke(request,org,{action:'create',username:window.MemberIdentity.username(f.elements.username.value),display_name:f.elements.display_name.value.trim(),password:f.elements.password.value,role:f.elements.role.value,permissions:permissions.read()});close();await load();}
       catch(e){error.textContent=e.message;f.elements.password.value=f.elements.confirm.value='';}
       finally{busy=false;submit.disabled=cancel.disabled=false;}
     };document.body.append(d);d.showModal();

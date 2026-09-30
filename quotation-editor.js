@@ -39,8 +39,7 @@
     return gross>0 ? Number(item.discount_amount||0)/gross*100 : 0;
   };
   const persist = async (request,draft) => {
-    await request('/rest/v1/documents?on_conflict=id', {method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(draft.document)});
-    await request('/rest/v1/document_items?on_conflict=document_id,position', {method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(draft.items.map(item=>({...item,document_id:draft.id})))});
+    await request('/rest/v1/rpc/crm_create_sales_document',{method:'POST',body:JSON.stringify({p_document:draft.document,p_items:draft.items})});
   };
   const mount = (root, customers, products, {vatRate=7,kind='quotation',productLookup}={}) => {
     const cash=kind==='cash_bill',title=cash?'บิลเงินสด':'ใบเสนอราคา';
