@@ -308,6 +308,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>à
     window.ProductCodePicker?.configure(async()=>{await ensureProducts();return state.products;});
     window.TaxInvoiceEdit?.configure(request,orgId,async()=>{await Promise.all([ensureProducts(),syncCustomers()]);return {customers:state.customers,products:state.products};},async()=>{await syncAll();await window.TaxInvoiceControl.invalidate();});
     window.CustomerEdit?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
+    window.CustomerDelete?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
     window.DocumentDelete?.configure(request,orgId,async kind=>{
       if(kind==='cash_bill')await syncCashBills();
       else if(kind==='delivery_note'){
