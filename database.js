@@ -235,6 +235,11 @@
 document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>ใบวางบิล</h2></div><p>ติ๊กเมื่อชำระเงินแล้ว • ไม่ได้ติ๊ก = ค้างจ่าย • บันทึกแยกแต่ละเอกสาร</p><article class="panel table-panel"><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>วันที่ครบกำหนดชำระเงิน</th><th>สถานะชำระเงิน</th><th></th></tr></thead><tbody>${rows.map((bill) => `<tr><td><strong>${bill.document_number}</strong></td><td>${bill.customer_name_snapshot}</td><td>฿ ${Number(bill.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${bill.due_date || bill.issue_date ? new Date(`${bill.due_date || bill.issue_date}T00:00:00`).toLocaleDateString('th-TH') : '—'}</td><td>${window.DocumentPayment.render(bill)}</td><td></td></tr>`).join('')}</tbody></table></article><article class="panel table-panel" style="margin-top:16px"><div class="panel-title"><div><h3>ใบกำกับภาษี / ใบเสร็จ</h3><p>เอกสารที่ออกหลังได้รับชำระเงิน</p></div></div><table><thead><tr><th>เลขที่เอกสาร</th><th>ลูกค้า</th><th>ยอดรวม</th><th>สถานะชำระเงิน</th></tr></thead><tbody>${taxInvoices.length ? taxInvoices.map((invoice) => `<tr><td><strong>${invoice.document_number}</strong></td><td>${invoice.customer_name_snapshot}</td><td>฿ ${Number(invoice.grand_total).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td><td>${window.DocumentPayment.render(invoice)}</td></tr>`).join('') : '<tr><td colspan="4">ยังไม่มีใบกำกับภาษี</td></tr>'}</tbody></table></article>`;
   };
   const separateTaxInvoices = () => {
+    const billingHeading=document.querySelector('#invoices .page-toolbar');
+    if(billingHeading&&!billingHeading.querySelector('[data-create-billing]')){
+      const button=document.createElement('button');button.type='button';button.className='primary';button.dataset.createBilling='';button.textContent='+ สร้างใบวางบิล';
+      button.onclick=()=>{if(!session||!orgId)return login();window.BillingCreate.open(request,orgId,async()=>{await syncAll();});};billingHeading.append(button);
+    }
     const taxPanel = document.querySelector('#invoices > article:last-child');
     if (!taxPanel || !taxPanel.querySelector('h3')) return;
     taxPage.replaceChildren(taxPanel);

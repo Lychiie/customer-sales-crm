@@ -35,5 +35,22 @@
       button.onclick=()=>ask(request,org,invoice,onSaved);cell.append(button);row.insertBefore(cell,row.children[6]);
     });
   };
-  window.BillingCreate={create,mount};
+  const open=async(request,org,onSaved)=>{
+    if(document.querySelector('#billing-select-dialog'))return;
+    const dialog=document.createElement('dialog');dialog.id='billing-select-dialog';
+    dialog.style.cssText='width:min(600px,calc(100% - 32px));padding:26px;border:0;border-radius:14px';
+    dialog.innerHTML='<button type="button" class="ghost" data-close style="float:right" aria-label="ปิด">×</button><h2>สร้างใบวางบิล</h2><p>เลือกใบกำกับภาษีต้นทาง</p><input type="search" placeholder="ค้นหาเลขที่เอกสาร / ลูกค้า" style="width:100%;padding:10px"><p role="status">กำลังโหลดใบกำกับภาษี…</p><div data-list style="max-height:360px;overflow:auto"></div>';
+    const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});document.body.append(dialog);dialog.showModal();
+    try{
+      const rows=(await window.TaxInvoiceControl.fetchAll(request,org)).filter(d=>!d.deleted_at&&['sent','approved','paid','overdue'].includes(d.status));
+      if(!dialog.isConnected)return;
+      const render=()=>{
+        const query=dialog.querySelector('input').value.trim().toLowerCase(),list=dialog.querySelector('[data-list]');list.replaceChildren();
+        const matches=rows.filter(d=>`${d.document_number} ${d.customer_name_snapshot}`.toLowerCase().includes(query));
+        dialog.querySelector('[role=status]').textContent=matches.length?`พบ ${matches.length} ใบ`:'ไม่พบใบกำกับภาษีที่ออกแล้ว';
+        matches.forEach(invoice=>{const button=document.createElement('button');button.type='button';button.className='ghost';button.style.cssText='display:block;width:100%;text-align:left;margin:8px 0';button.textContent=`${invoice.document_number} • ${invoice.customer_name_snapshot}`;button.onclick=()=>{close();ask(request,org,invoice,onSaved);};list.append(button);});
+      };dialog.querySelector('input').oninput=render;render();
+    }catch(error){if(dialog.isConnected)dialog.querySelector('[role=status]').textContent=`โหลดไม่สำเร็จ: ${error.message}`;}
+  };
+  window.BillingCreate={create,mount,open};
 })();
