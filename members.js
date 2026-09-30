@@ -32,10 +32,32 @@
       root.querySelectorAll('tbody tr').forEach((row,i)=>{
         const roleCell=document.createElement('td');roleCell.textContent=roles[data.members[i].role]||'ไม่ทราบสิทธิ์';row.append(roleCell);
         const cell=document.createElement('td'),button=document.createElement('button');button.className='ghost';button.textContent='แก้ไข';button.setAttribute('aria-label','แก้ไขข้อมูลสมาชิก '+data.members[i].display_name);
-        button.onclick=()=>edit(request,org,data.members[i]);cell.append(button);row.append(cell);
+        button.onclick=()=>edit(request,org,data.members[i]);cell.append(button);
+        const remove=document.createElement('button');remove.type='button';remove.className='ghost';remove.textContent='ลบ';remove.style.cssText='color:#b42332;margin-left:6px';remove.setAttribute('aria-label','ลบสมาชิก '+data.members[i].display_name);
+        remove.disabled=data.members[i].user_id===context.user;
+        if(remove.disabled)remove.title='ไม่สามารถลบบัญชีตัวเองได้';
+        remove.onclick=()=>removeMember(request,org,data.members[i]);cell.append(remove);row.append(cell);
       });
       root.querySelector('[data-add]').onclick=()=>open(request,org);
     }catch(e){if(current!==version)return;root.innerHTML='<article class="panel settings-card"><p role="alert">'+escape(e.message)+'</p><button class="ghost">ลองใหม่</button></article>';root.querySelector('button').onclick=load;}
+  };
+  const removeMember=(request,org,member)=>{
+    if(document.querySelector('#member-dialog'))return;
+    const d=document.createElement('dialog');d.id='member-dialog';d.style.cssText='width:min(540px,calc(100% - 32px));border:0;border-radius:16px;padding:28px';
+    d.innerHTML='<form><h2>ยืนยันลบสมาชิก</h2><p>'+escape(member.display_name)+' ('+escape(member.username)+')</p><p>สมาชิกจะถูกนำออกจากองค์กรและไม่สามารถเข้าถึงข้อมูลขององค์กรนี้ได้ ประวัติเอกสารเดิมยังคงอยู่ ไม่ได้ลบบัญชีเข้าสู่ระบบกลางหรือสมาชิกขององค์กรอื่น</p><p role="alert"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="submit" class="primary" style="background:#b42332">ยืนยันลบสมาชิก</button></div></form>';
+    let busy=false;const close=()=>{if(!busy){d.close();d.remove();}};
+    d.querySelector('[data-cancel]').onclick=close;d.oncancel=e=>{e.preventDefault();close();};
+    d.querySelector('form').onsubmit=async e=>{
+      e.preventDefault();if(busy)return;const error=d.querySelector('[role=alert]');
+      if(context?.org!==org){error.textContent='องค์กรเปลี่ยน กรุณาโหลดรายการใหม่';return;}
+      busy=true;d.querySelectorAll('button').forEach(b=>b.disabled=true);error.textContent='กำลังลบสมาชิก…';
+      try{
+        const result=await request('/rest/v1/rpc/crm_remove_member',{method:'POST',body:JSON.stringify({p_org:org,p_user:member.user_id})});
+        if(result?.removed!==member.user_id)throw Error('ยืนยันผลการลบไม่ได้ กรุณาโหลดรายการใหม่ก่อนลองอีกครั้ง');
+        busy=false;close();await load();
+      }catch(err){error.textContent=err.message;busy=false;d.querySelectorAll('button').forEach(b=>b.disabled=false);}
+    };
+    document.body.append(d);d.showModal();d.querySelector('[data-cancel]').focus();
   };
   const edit=(request,org,member)=>{
     if(document.querySelector('#member-dialog'))return;
