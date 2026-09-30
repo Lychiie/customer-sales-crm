@@ -93,7 +93,7 @@
       @media print{
         @page{size:215.9mm 279.4mm;margin:0}
         html,body{margin:0!important;padding:0!important;background:white!important}
-        body>*:not(#continuous-preview){display:none!important}
+        body:has(> #continuous-preview)>*:not(#continuous-preview){display:none!important}
         body>#continuous-preview{display:block!important;position:static!important;padding:0!important;overflow:visible!important;background:white!important}
         #continuous-preview .cf-tools{display:none!important}#continuous-preview .cf-sheet{margin:0;box-shadow:none;break-after:page;page-break-after:always}
         #continuous-preview .cf-sheet:last-child{break-after:auto;page-break-after:auto}#continuous-preview .cf-guides{display:none!important}
