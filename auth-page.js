@@ -5,7 +5,7 @@
   if(location.protocol==='file:'){
     const next=safePage(location.hash.slice(1)||new URLSearchParams(location.search).get('next'));
     const route=document.documentElement.dataset.loginPage==='true'?'login.html?next='+encodeURIComponent(next):'index.html#'+next;
-    location.replace('https://lychiie.github.io/customer-sales-crm/'+route);
+    location.replace('https://boonyok.github.io/customer-sales-crm/'+route);
     return;
   }
   const loginUrl=()=>new URL('login.html?next='+encodeURIComponent(safePage(location.hash.slice(1))),location.href).href;
