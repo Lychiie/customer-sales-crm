@@ -83,16 +83,18 @@
   const syncProducts = async () => {
     const requestOrg=orgId;
     // Page variants directly: embedded variants are capped per product by the API.
-    const rows=[],pageSize=500,concurrency=4;
-    for(let offset=0;;offset+=pageSize*concurrency){
-      const pages=await Promise.all(Array.from({length:concurrency},(_,index)=>
-        request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(requestOrg)+'&order=id.asc&limit='+pageSize+'&offset='+(offset+index*pageSize))));
+    const rows=[],pageSize=1000;
+    let cursor=null;
+    for(;;){
+      // Keyset paging avoids rescanning all earlier rows and their RLS checks.
+      const page=await request('/rest/v1/product_variants?select=id,sku,label,is_active,product:products!inner(id,code,name,unit,is_active),variant_prices(price,starts_on)&product.organization_id=eq.'+encodeURIComponent(requestOrg)+'&order=id.asc&limit='+pageSize+(cursor?'&id=gt.'+encodeURIComponent(cursor):''));
       if(orgId!==requestOrg)return;
-      if(pages.some(page=>!Array.isArray(page)))throw Error('โหลดรายการสินค้าไม่สำเร็จ');
-      let complete=false;
-      for(const page of pages){rows.push(...page);if(page.length<pageSize){complete=true;break;}}
+      if(!Array.isArray(page))throw Error('โหลดรายการสินค้าไม่สำเร็จ');
+      if(!page.length)break;
+      const nextCursor=page[page.length-1].id;
+      if(!nextCursor||nextCursor===cursor)throw Error('โหลดรายการสินค้าไม่ครบ กรุณาลองอีกครั้ง');
+      rows.push(...page);cursor=nextCursor;
       showProductDeleteNotice('กำลังโหลดสินค้า '+rows.length.toLocaleString('th-TH')+' รายการ… ใช้งานหน้าอื่นได้ระหว่างรอ');
-      if(complete)break;
     }
     const compareSku=new Intl.Collator(undefined,{numeric:true}).compare;
     const products=rows.map(variant=>{
