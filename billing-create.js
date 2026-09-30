@@ -1,8 +1,8 @@
 (() => {
-  const create=async(request,org,invoice,date,credit)=>{
+  const create=async(request,org,invoice,date,credit,manualDocumentNumber='')=>{
     if(!org||invoice?.organization_id!==org||!invoice.id||invoice.kind!=='tax_invoice'||!['sent','approved','paid','overdue'].includes(invoice.status))throw Error('กรุณาเลือกใบกำกับภาษีที่ออกแล้ว');
     if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(credit)||credit<0||credit>3650)throw Error('กรุณาระบุวันที่และเครดิต 0–3650 วัน');
-    const result=await request('/rest/v1/rpc/create_invoice_billing_note',{method:'POST',body:JSON.stringify({p_org:org,p_invoice:invoice.id,p_date:date,p_credit:credit})});
+    const result=await window.DocumentNumber.call(request,'create_invoice_billing_note',{p_org:org,p_invoice:invoice.id,p_date:date,p_credit:credit},manualDocumentNumber);
     if(!result?.id||result.invoice_id!==invoice.id||!result.document_number)throw Error('ยังยืนยันผลไม่ได้ กรุณาลองตรวจสอบอีกครั้ง ระบบจะใช้ใบวางบิลเดิมโดยไม่สร้างซ้ำ');
     return result;
   };
@@ -12,12 +12,13 @@
     dialog.innerHTML='<form><h2>ออกใบวางบิล</h2><p data-source></p><p>เชื่อมใบกำกับภาษีนี้ 1 ใบ และใช้ยอดเงินจากเอกสารต้นทาง</p><label class="field"><span>วันที่ใบวางบิล</span><input name="date" type="date" required></label><label class="field"><span>เครดิต (วัน) — 0 คือชำระทันที</span><input name="credit" type="number" min="0" max="3650" step="1" required placeholder="ระบุจำนวนวัน"></label><p role="alert" data-error></p><div class="form-actions"><button class="ghost" type="button" data-cancel>ยกเลิก</button><button class="primary" type="submit">ยืนยันออกใบวางบิล</button></div></form>';
     dialog.querySelector('[data-source]').textContent=`${invoice.document_number} • ${invoice.customer_name_snapshot}`;
     const form=dialog.querySelector('form'),cancel=dialog.querySelector('[data-cancel]'),submit=dialog.querySelector('[type=submit]'),error=dialog.querySelector('[data-error]');
+    window.DocumentNumber.mount(form);
     form.elements.date.value=window.QuotationEditor.issueDate();let busy=false;
     const close=()=>{dialog.close();dialog.remove();};cancel.onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)close();});
     form.onsubmit=async e=>{
       e.preventDefault();if(busy||!form.reportValidity())return;busy=true;cancel.disabled=submit.disabled=true;error.textContent='';submit.textContent='กำลังออกใบวางบิล…';
       try{
-        const result=await create(request,org,invoice,form.elements.date.value,Number(form.elements.credit.value));
+        const result=await create(request,org,invoice,form.elements.date.value,Number(form.elements.credit.value),window.DocumentNumber.read(form));
         close();try{await onSaved?.();}catch{}
         const button=document.createElement('button');button.dataset.printDocument=result.document_number;document.body.append(button);button.click();button.remove();
         alert(`${result.created?'ออกใบวางบิลแล้ว':'ใบกำกับภาษีนี้มีใบวางบิลอยู่แล้ว'}: ${result.document_number}`);

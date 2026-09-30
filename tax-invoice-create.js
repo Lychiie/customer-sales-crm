@@ -23,7 +23,8 @@
     const key=`${payload.p_org}:${payload.p_id}`;
     if(pending.has(key))return pending.get(key);
     const operation=(async()=>{
-      const result=await request('/rest/v1/rpc/create_standalone_tax_invoice',{method:'POST',body:JSON.stringify(payload)});
+      const {manualDocumentNumber,...rpcPayload}=payload;
+      const result=await window.DocumentNumber.call(request,'create_standalone_tax_invoice',rpcPayload,manualDocumentNumber);
       if(result?.id!==payload.p_id||!result.document_number||typeof result.created!=='boolean')throw Error('ยังยืนยันผลการบันทึกไม่ได้ กรุณาลองยืนยันรายการเดิมอีกครั้ง');
       return result;
     })();
@@ -68,6 +69,7 @@
       mode='quote';const available=candidates(quotes,links);
       root.innerHTML=`<div class="form-content" style="padding:30px"><h2>สร้างจากใบเสนอราคาที่อนุมัติแล้ว</h2><p>คัดลอกลูกค้า รายการสินค้า ส่วนลด และยอดเงินเดิม • ไม่บันทึกรับชำระเงิน</p><label class="field"><span>ใบเสนอราคาที่ยังไม่ออกใบกำกับภาษี</span><select name="quotationId" required style="width:100%;padding:12px;font:inherit"><option value="">เลือกใบเสนอราคา</option>${available.map(q=>`<option value="${escape(q.id)}">${escape(q.no)} — ${escape(q.customer)} — ${escape(q.total)}</option>`).join('')}</select></label><p>${available.length?'ตรวจสอบเอกสารต้นทางให้ถูกต้องก่อนยืนยัน':'ไม่มีใบเสนอราคาที่อนุมัติแล้วและยังไม่ออกใบกำกับภาษี'}</p><p data-tax-error role="alert" style="color:#b42318"></p><div class="form-actions"><button type="button" class="ghost" data-close>ยกเลิก</button><button class="primary" type="submit" ${available.length?'':'disabled'}>สร้างใบกำกับภาษี</button></div></div>`;
       root.querySelector('[data-close]').onclick=close;
+      window.DocumentNumber.mount(root);
     };
     form.addEventListener('submit',async event=>{
       event.preventDefault();if(busy||mode==='choice')return;
@@ -78,13 +80,15 @@
           if(!quote)throw Error('กรุณาเลือกใบเสนอราคาที่อนุมัติแล้ว');
           if(!confirm(`สร้างใบกำกับภาษีจาก ${quote.no} โดยใช้ลูกค้า รายการสินค้า และยอดเงินเดิม?`))return;
         }else if(!savedPayload){
+          const manualDocumentNumber=window.DocumentNumber.read(root);
           savedPayload=prepare(Object.fromEntries(new FormData(form)),editor.read(),customers,products,org,crypto.randomUUID());
+          savedPayload.manualDocumentNumber=manualDocumentNumber;
           // Save the operation before sending: reopening/reloading this tab can safely retry.
           try{sessionStorage.setItem(storageKey,JSON.stringify(savedPayload));}catch{savedPayload=null;throw Error('ไม่สามารถเก็บรหัสป้องกันเอกสารซ้ำในเบราว์เซอร์ได้ จึงยังไม่ส่งบันทึก');}
         }
         lock(true);
         let result;
-        try{result=quote?await window.QuotationTax.issue(request,org,quote):await issue(request,savedPayload);}
+        try{result=quote?await window.QuotationTax.issue(request,org,quote,window.DocumentNumber.read(root)):await issue(request,savedPayload);}
         catch(error){
           // A failed HTTP request can still have committed. Keep the same ID and payload.
           if(!quote){

@@ -39,7 +39,7 @@
     return gross>0 ? Number(item.discount_amount||0)/gross*100 : 0;
   };
   const persist = async (request,draft) => {
-    await request('/rest/v1/rpc/crm_create_sales_document',{method:'POST',body:JSON.stringify({p_document:draft.document,p_items:draft.items})});
+    await window.DocumentNumber.call(request,'crm_create_sales_document',{p_document:draft.document,p_items:draft.items},draft.manualDocumentNumber);
   };
   const mount = (root, customers, products, {vatRate=7,kind='quotation',productLookup}={}) => {
     const cash=kind==='cash_bill',title=cash?'บิลเงินสด':'ใบเสนอราคา';
@@ -48,6 +48,7 @@
     const numberingNotice=document.createElement('p');
     numberingNotice.textContent=cash?`เลขที่อัตโนมัติรูปแบบ CB${String(Number(issueDate().slice(0,4))+543).slice(-2)}-0001 • เรียงตามปี พ.ศ.`:`เลขที่อัตโนมัติรูปแบบ ${numberExample(issueDate())} • เรียงตามปี พ.ศ. • ระบบกำหนดเลขจริงเมื่อบันทึก`;
     root.querySelector('h2').after(numberingNotice);
+    window.DocumentNumber.mount(root);
     const container=root.querySelector('.qe-items');
     const read=()=>[...container.children].map(row=>({variantId:row.querySelector('[data-variant]').value,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unitPrice:row.querySelector('[data-price]').value,discountRate:row.querySelector('[data-discount]').value}));
     const update=()=>{

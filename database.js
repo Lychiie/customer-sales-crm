@@ -375,6 +375,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     await syncProducts(); render();
   };
   const addQuotation = async (data) => {
+    data.manualDocumentNumber=window.DocumentNumber.normalize(data.manualDocumentNumber);
     const formToken=openingDocument;
     if(editorOrg!==orgId)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
     const customer = editorCustomers.find((item) => item.id === data.customerId);
@@ -394,7 +395,8 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     }
     // The atomic RPC can be retried after a lost response without duplicate rows.
     const submittedQuotation=pendingQuotation;
-    await window.QuotationEditor.persist(request,submittedQuotation);
+    submittedQuotation.manualDocumentNumber=data.manualDocumentNumber;
+    try{await window.QuotationEditor.persist(request,submittedQuotation);}catch(error){if(error.code==='22023')pendingQuotation=null;throw error;}
     if(pendingQuotation===submittedQuotation)pendingQuotation=null;
     if(formToken===openingDocument)modal.close();
     try { await syncAll(); } catch { alert('บันทึกใบเสนอราคาแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ'); }
@@ -503,7 +505,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
         const rows=quotationEditor.read(),{items,...totals}=window.QuotationEditor.calculate(rows,editorProducts,0);
         if(!/^\d{4}-\d{2}-\d{2}$/.test(data.issueDate||''))throw new Error('กรุณาระบุวันที่ออกบิล');
         const id=crypto.randomUUID(),documentData={id,organization_id:orgId,kind:'cash_bill',document_number:`CB-${id.slice(0,8).toUpperCase()}`,status:'sent',payment_received:false,customer_id:customer.id,customer_name_snapshot:customer.name,customer_tax_id_snapshot:customer.taxId==='-'?null:customer.taxId,customer_address_snapshot:customer.address||null,issue_date:data.issueDate,...totals,notes:window.QuotationEditor.encode({paymentTerms:data.paymentTerms||'เงินสด',notes:data.notes||'',rates:rows.map(r=>Number(r.discountRate))}),created_by:session.user.id};
-        await window.QuotationEditor.persist(request,{id,document:documentData,items});if(formToken===openingDocument)modal.close();await syncAll();
+        await window.QuotationEditor.persist(request,{id,document:documentData,items,manualDocumentNumber:data.manualDocumentNumber});if(formToken===openingDocument)modal.close();await syncAll();
       }
     } catch (error) { if (modal.dataset.type === 'login') document.querySelector('#loginError').textContent = error.message; else alert(error.message); }
   }, true);

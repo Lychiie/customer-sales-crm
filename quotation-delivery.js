@@ -32,7 +32,7 @@
       if (data.shipping.trim().length > 1500 || (data.notes || '').length > 1500) throw Error('สถานที่จัดส่งและหมายเหตุต้องไม่เกิน 1500 ตัวอักษร');
       let result;
       try {
-        result = await request('/rest/v1/rpc/issue_quotation_delivery_note', {method:'POST', body:JSON.stringify({p_org:org,p_quote:quote.id,p_date:data.date,p_shipping:data.shipping.trim(),p_notes:(data.notes || '').trim()})});
+        result = await window.DocumentNumber.call(request,'issue_quotation_delivery_note',{p_org:org,p_quote:quote.id,p_date:data.date,p_shipping:data.shipping.trim(),p_notes:(data.notes || '').trim()},data.manualDocumentNumber);
       } catch (error) {
         if (/Could not find the function|function .* does not exist/i.test(error.message)) throw Error('ยังไม่ได้เปิดใช้การออกใบส่งสินค้าจากใบเสนอราคาในฐานข้อมูล');
         throw error;
@@ -55,6 +55,7 @@
       <h3>รายการจากใบเสนอราคา (${items.length} รายการ)</h3><p>คัดลอกรายการและจำนวนตามใบเสนอราคา ไม่แสดงราคาในใบส่งสินค้า หากเคยออกจากใบเสนอราคานี้แล้ว ระบบจะเปิดใบเดิม</p><table><thead><tr><th>ลำดับ</th><th>รายการสินค้า / ขนาด</th><th>จำนวน</th><th>หน่วย</th></tr></thead><tbody>${items.map((i,n)=>`<tr><td>${n+1}</td><td>${escape([i.product_name_snapshot,i.specification_snapshot].filter(Boolean).join(' '))}</td><td>${escape(i.quantity)}</td><td>${escape(i.unit_snapshot)}</td></tr>`).join('')}</tbody></table>
       <label><span>หมายเหตุใบส่งสินค้า</span><textarea name="notes" rows="2" maxlength="1500"></textarea></label><p role="status"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="submit" class="primary">บันทึกใบส่งสินค้า</button></div></form>`;
     const form=dialog.querySelector('form');let saving=false;
+    window.DocumentNumber.mount(form);
     form.elements.date.value=window.QuotationEditor.issueDate();
     dialog.querySelector('[data-copy]').onclick=()=>{form.elements.shipping.value=source.customer_address_snapshot || '';};
     dialog.querySelector('[data-cancel]').onclick=()=>{if(!saving)dialog.remove();};
@@ -63,7 +64,7 @@
       event.preventDefault();if(saving || !form.reportValidity())return;
       saving=true;form.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=true);dialog.querySelector('[role=status]').textContent='กำลังบันทึก…';
       try{
-        const result=await issue(request,org,quote,{date:form.elements.date.value,shipping:form.elements.shipping.value,notes:form.elements.notes.value});
+        const result=await issue(request,org,quote,{date:form.elements.date.value,shipping:form.elements.shipping.value,notes:form.elements.notes.value,manualDocumentNumber:window.DocumentNumber.read(form)});
         dialog.remove();
         try{await onSaved(result);}catch{alert(`บันทึกใบส่งสินค้า ${result.document_number} แล้ว แต่เปิดตัวอย่างไม่ได้ กรุณาเปิดจากเมนูใบส่งสินค้า`);}
       }catch(error){dialog.querySelector('[role=status]').textContent=error.message;}

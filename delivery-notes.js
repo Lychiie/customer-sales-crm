@@ -72,9 +72,10 @@
     dialog.querySelector('[data-preview]').onclick=()=>{try{const data=collect();if(data){dialog.close();preview(data.doc,data.items);document.querySelector('#dn-preview [data-close]').onclick=()=>{document.querySelector('#dn-preview').remove();dialog.showModal();};}}catch(e){dialog.querySelector('.dn-error').textContent=e.message;}};
     dialog.querySelector('[data-cancel]').onclick=()=>{dialog.remove();};dialog.addEventListener('cancel',()=>dialog.remove());
     form.onsubmit=async event=>{event.preventDefault();if(saving)return;try{const data=collect();if(!data)return;saving=true;form.querySelector('button[type=submit]').disabled=true;dialog.querySelector('.dn-error').textContent='กำลังบันทึก…';
-      const id=await actionApi('/rest/v1/rpc/save_delivery_note',{method:'POST',body:JSON.stringify({p_id:pendingId,p_org:actionOrg,p_customer:data.doc.customer_id,p_date:data.doc.issue_date,p_shipping:data.doc.shipping_address,p_notes:data.doc.notes,p_items:data.items.map(i=>({variant_id:i.variant_id,quantity:i.quantity}))})});
+      const id=await window.DocumentNumber.call(actionApi,'save_delivery_note',{p_id:pendingId,p_org:actionOrg,p_customer:data.doc.customer_id,p_date:data.doc.issue_date,p_shipping:data.doc.shipping_address,p_notes:data.doc.notes,p_items:data.items.map(i=>({variant_id:i.variant_id,quantity:i.quantity}))},window.DocumentNumber.read(form));
       dialog.remove();await load(api,organizationId);await showSaved(id);
     }catch(e){dialog.querySelector('.dn-error').textContent=`บันทึกไม่สำเร็จ: ${e.message}`;}finally{saving=false;const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=false;}};
+    window.DocumentNumber.mount(form);
     document.body.append(dialog);dialog.showModal();
   };
   const showSaved=async id=>{const rows=await api(`/rest/v1/delivery_notes?id=eq.${encodeURIComponent(id)}&organization_id=eq.${organizationId}&select=*,delivery_note_items(*)`);if(!rows[0])throw new Error('ไม่พบเอกสาร');preview(rows[0],rows[0].delivery_note_items.sort((a,b)=>a.position-b.position));};

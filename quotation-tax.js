@@ -1,16 +1,14 @@
 (() => {
   const pending = new Map();
   const canIssue = quote => Boolean(quote?.id && quote.statusCode === 'approved');
-  const issue = (request, organizationId, quote) => {
+  const issue = (request, organizationId, quote, manualDocumentNumber='') => {
     if (!organizationId || !canIssue(quote)) return Promise.reject(Error('ออกใบกำกับภาษีได้เฉพาะใบเสนอราคาที่อนุมัติแล้ว'));
     const key = `${organizationId}:${quote.id}`;
     if (pending.has(key)) return pending.get(key);
     const operation = (async () => {
       let result;
       try {
-        result = await request('/rest/v1/rpc/issue_quotation_tax_invoice', {
-          method: 'POST', body: JSON.stringify({p_org: organizationId, p_id: quote.id})
-        });
+        result = await window.DocumentNumber.call(request,'issue_quotation_tax_invoice',{p_org: organizationId, p_id: quote.id},manualDocumentNumber);
       } catch (error) {
         if (/Could not find the function|function .* does not exist/i.test(error.message)) throw Error('ยังไม่ได้เปิดใช้การออกใบกำกับภาษีจากใบเสนอราคาในฐานข้อมูล');
         throw error;
