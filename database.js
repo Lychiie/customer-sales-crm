@@ -633,7 +633,9 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     });
     document.querySelectorAll('#quotation-body tr, #invoices tbody tr, #tax-invoices tbody tr').forEach((row) => {
       const number = row.cells[0]?.textContent.trim();
-      if (!/^(?:(?:QT|BL|TI|CB)-|(?:QT|BL|CB)\d{2}-\d{4}$|IV\d{2}(?:0[1-9]|1[0-2])-\d{4}$)/.test(number || '') || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
+      // Saved document rows can have custom numbers; their shape, not a prefix,
+      // distinguishes them from the one-cell empty-state row.
+      if (!number || row.cells.length < 2 || [...row.querySelectorAll('[data-print-document]')].some(button => button.dataset.printDocument === number)) return;
       const printButton = document.createElement('button');
       printButton.type = 'button'; printButton.className = 'ghost';
       printButton.dataset.printDocument = number; printButton.textContent = 'พิมพ์ / PDF';
