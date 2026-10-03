@@ -520,7 +520,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   }, true);
   const escapePrint = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const previewDocument = async (number) => {
-    const doc = (await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${encodeURIComponent(number)}&select=*&limit=1`))[0];
+    let doc = (await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${encodeURIComponent(number)}&select=*&limit=1`))[0];
     if (!doc) throw new Error('ไม่พบเอกสาร กรุณาเข้าสู่ระบบแล้วลองใหม่');
     const [companies, items] = await Promise.all([
       request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,payment_account,office_code,office_name&limit=1`),
@@ -529,6 +529,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
         : request(`/rest/v1/document_items?document_id=eq.${doc.id}&select=*&order=position.asc`)
     ]);
     const company = companies[0] || {};
+    doc = await window.OfficeBranch.resolve(request,orgId,doc,company);
     const e = escapePrint;
     const money = (value) => Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('th-TH') : '-';

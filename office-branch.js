@@ -21,5 +21,18 @@
   if(before)before.before(box);else root.append(box);
   return box;
  };
- window.OfficeBranch={normalize,label,read,readName,mount};
+ // Legacy invoices predate office snapshots. Resolve missing offices for this
+ // preview only; never overwrite a recorded office or write historical data.
+ const resolve=async(request,org,doc,company)=>{
+  if(doc.kind!=='tax_invoice')return doc;
+  const result={...doc};
+  if(!result.issuer_office_snapshot&&company?.office_code){result.issuer_office_snapshot=company.office_code;result.issuer_office_name_snapshot=company.office_name||null;}
+  if(!result.customer_office_snapshot&&doc.customer_id){
+   const rows=await request(`/rest/v1/customers?organization_id=eq.${encodeURIComponent(org)}&id=eq.${encodeURIComponent(doc.customer_id)}&select=id,office_code,office_name&limit=1`);
+   const customer=rows?.[0];
+   if(customer?.id===doc.customer_id&&customer.office_code){result.customer_office_snapshot=customer.office_code;result.customer_office_name_snapshot=customer.office_name||null;}
+  }
+  return result;
+ };
+ window.OfficeBranch={normalize,label,read,readName,mount,resolve};
 })();
