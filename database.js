@@ -312,6 +312,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>à
     window.CompanyDashboard?.configure(request,orgId);
     window.ProductCodePicker?.configure(async()=>{await ensureProducts();return state.products;});
     window.TaxInvoiceEdit?.configure(request,orgId,async()=>{await Promise.all([ensureProducts(),syncCustomers()]);return {customers:state.customers,products:state.products};},async()=>{await syncAll();await window.TaxInvoiceControl.invalidate();});
+    window.CashBillEdit?.configure(request,orgId,async()=>{const actionOrg=orgId;await syncCustomers();return {customers:state.customers,products:[],lookupProducts:query=>lookupProductCodes(query,actionOrg)};},async()=>{await syncCashBills();});
     window.CustomerEdit?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
     window.CustomerDelete?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
     window.DocumentDelete?.configure(request,orgId,async kind=>{
