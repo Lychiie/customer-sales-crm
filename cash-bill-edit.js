@@ -24,8 +24,8 @@
   return {p_org:doc.organization_id,p_id:doc.id,p_number:doc.document_number,p_expected_updated_at:doc.updated_at,p_customer:data.customerId||null,p_issue:data.issueDate,p_due:data.dueDate,p_terms:data.paymentTerms||'',p_notes:data.notes||'',p_items:items.map(i=>({...i,quantity:Number(i.quantity),unit_price:Number(i.unit_price),discount_amount:Number(i.discount_amount)}))};
  };
  const save=async(request,p)=>{
-  const result=await request('/rest/v1/rpc/edit_cash_bill',{method:'POST',body:JSON.stringify(p)});
-  if(result?.id!==p.p_id||result.document_number!==p.p_number||result.updated!==true||!result.updated_at)throw Error('ยังยืนยันผลบันทึกไม่ได้ กรุณาปิดแล้วเปิดเอกสารตรวจสอบก่อนลองใหม่');
+  const result=await request('/rest/v1/rpc/edit_cash_bill_numbered',{method:'POST',body:JSON.stringify(p)});
+  if(result?.id!==p.p_id||result.document_number!==(p.p_new_number||p.p_number)||result.updated!==true||!result.updated_at)throw Error('ยังยืนยันผลบันทึกไม่ได้ กรุณาปิดแล้วเปิดเอกสารตรวจสอบก่อนลองใหม่');
   return result;
  };
  let context;
@@ -45,6 +45,10 @@
    customers.unshift({id:doc.customer_id||'',name:doc.customer_name_snapshot});
    dialog.innerHTML=`<style>#cash-edit-dialog .te-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#cash-edit-dialog .te-line{padding:16px;background:#f7faf9;border:1px solid #dce5e3;border-radius:10px;margin:12px 0}#cash-edit-dialog textarea,#cash-edit-dialog input,#cash-edit-dialog select{width:100%;padding:10px;border:1px solid #ccd4dd;border-radius:6px;font:inherit;box-sizing:border-box}#cash-edit-dialog .te-numbers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}#cash-edit-dialog .te-top{display:flex;justify-content:space-between;gap:10px;align-items:center}#cash-edit-dialog [data-error]{color:#b42318;white-space:pre-wrap}@media(max-width:650px){#cash-edit-dialog .te-grid,#cash-edit-dialog .te-numbers{grid-template-columns:1fr}}</style><form><h2>แก้ไขบิลเงินสด ${esc(number)}</h2><p>คงเลขเอกสารเดิม • ไม่คิด VAT • ไม่เปลี่ยนเอกสารต้นทาง • รหัสสินค้าไม่แสดงในแบบพิมพ์</p><div class="te-grid"><label class="field"><span>ลูกค้า</span><select name="customerId">${customers.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><label class="field"><span>วันที่เอกสาร</span><input name="issueDate" type="date" required min="2000-01-01" max="2199-12-31" value="${esc(doc.issue_date)}"></label><label class="field"><span>วันที่ครบกำหนดชำระเงิน</span><input name="dueDate" type="date" required min="2000-01-01" max="2199-12-31" value="${esc(doc.due_date||doc.issue_date)}"></label><label class="field"><span>เงื่อนไขชำระเงิน</span><input name="paymentTerms" maxlength="120" value="${esc(details.paymentTerms)}"></label></div><h3>รายการสินค้า</h3><div data-lines></div><button type="button" class="ghost" data-add>+ เพิ่มรายการสินค้า</button><label class="field"><span>หมายเหตุ</span><textarea name="notes" rows="3" maxlength="4000">${esc(details.notes)}</textarea></label><p data-total aria-live="polite"></p><p data-error role="alert"></p><div class="form-actions"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="submit" class="primary">บันทึกการแก้ไข</button></div></form>`;
    const form=dialog.querySelector('form'),lines=form.querySelector('[data-lines]');
+   const numberLabel=document.createElement('label');numberLabel.className='field';
+   numberLabel.innerHTML='<span>เลขที่เอกสาร</span><input name="documentNumber" required maxlength="80" autocomplete="off"><small>แก้ไขได้ แต่ห้ามซ้ำกับเอกสารที่มีอยู่ รวมถึงในถังขยะ</small>';
+   numberLabel.querySelector('input').value=doc.document_number;form.querySelector('.te-grid').prepend(numberLabel);
+   form.querySelector('h2').nextElementSibling.textContent='แก้เลขที่บิลเดิมได้ • ไม่คิด VAT • รหัสสินค้าไม่แสดงในแบบพิมพ์';
    const read=()=>[...lines.children].map(row=>({existing_item_id:row.dataset.existing||null,variant_id:row.dataset.variant||null,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unit_price:row.querySelector('[data-price]').value,discount_amount:row.querySelector('[data-discount]').value}));
    const update=()=>{try{const t=totals(read(),0);form.querySelector('[data-total]').textContent=`รวม ${money(t.subtotal)} · ส่วนลด ${money(t.discount)} · ยอดสุทธิ ${money(t.total)} บาท`;}catch(e){form.querySelector('[data-total]').textContent=e.message;}};
    const add=item=>{
@@ -59,7 +63,8 @@
     event.preventDefault();if(busy)return;const error=form.querySelector('[data-error]');error.textContent='';
     try{
      if(ctx!==context)throw Error('องค์กรเปลี่ยนแล้ว กรุณาเปิดเอกสารใหม่');
-     const p=payload(doc,Object.fromEntries(new FormData(form)),read());busy=true;
+     const data=Object.fromEntries(new FormData(form));
+     const p=payload(doc,data,read());p.p_new_number=window.DocumentNumber.normalize(data.documentNumber);if(!p.p_new_number)throw Error('กรุณาระบุเลขที่เอกสาร');busy=true;
      const fields=[...form.querySelectorAll('button,input,select,textarea')];fields.forEach(e=>e.disabled=true);
      try{await save(ctx.request,p);}catch(e){fields.forEach(el=>el.disabled=false);throw e;}
      dialog.close();try{await ctx.refresh();}catch{alert('บันทึกการแก้ไขแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ');}
