@@ -7,7 +7,7 @@
     if(tax&&!/^\d{13}$/.test(tax))throw Error('เลขผู้เสียภาษีต้องมี 13 หลัก หรือเว้นว่าง');
     if(String(data.creditDays??'').trim()===''||!Number.isSafeInteger(days)||days<0||days>3650)throw Error('กรุณาระบุเครดิต 0–3650 วัน (0 = เงินสด)');
     const text=key=>String(data[key]??'').trim()||null;
-    return {office_code:window.OfficeBranch.read(data),name,contact_name:text('contact'),tax_id:tax||null,phone:text('phone'),billing_address:text('address'),credit_term_days:days};
+    return {office_code:window.OfficeBranch.read(data),office_name:window.OfficeBranch.readName(data),name,contact_name:text('contact'),tax_id:tax||null,phone:text('phone'),billing_address:text('address'),credit_term_days:days};
   };
   const update=async(request,org,customer,data)=>{
     if(!org||!customer?.id||customer.organization_id!==org||!customer.updated_at)throw Error('ข้อมูลลูกค้าไม่ครบ กรุณาเปิดรายการใหม่');
@@ -28,7 +28,7 @@
       dialog.style.cssText='width:min(620px,94vw);max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:24px';
       const field=(label,name,value,attrs='')=>`<label class="field" style="display:block;margin:14px 0"><span style="display:block;margin-bottom:6px">${label}</span><input style="width:100%;padding:10px;border:1px solid #dfe3ea;border-radius:8px;font:inherit" name="${name}" value="${esc(value)}" ${attrs}></label>`;
       dialog.innerHTML=`<form><h2 id="customer-edit-title">แก้ไขข้อมูลลูกค้า</h2><p>ใช้กับเอกสารที่สร้างใหม่ เอกสารเดิมจะคงข้อมูล ณ วันที่ออกเอกสาร</p>${field('ชื่อบริษัท / ลูกค้า *','name',customer.name,'required maxlength="300"')}${field('ผู้ติดต่อ','contact',customer.contact_name,'maxlength="200"')}${field('เลขประจำตัวผู้เสียภาษี','taxId',customer.tax_id,'inputmode="numeric" maxlength="13"')}${field('โทรศัพท์','phone',customer.phone,'type="tel" maxlength="60"')}<label class="field" style="display:block;margin:14px 0"><span style="display:block;margin-bottom:6px">ที่อยู่สำหรับออกเอกสาร</span><textarea name="address" rows="3" maxlength="2000" style="width:100%;padding:10px;border:1px solid #dfe3ea;border-radius:8px;font:inherit">${esc(customer.billing_address)}</textarea></label>${field('เงื่อนไขชำระเงิน — เครดิต (วัน), 0 = เงินสด','creditDays',customer.credit_term_days??0,'type="number" min="0" max="3650" step="1" required')}<p role="status" data-error style="color:#b42332"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="ghost" data-cancel>ยกเลิก</button><button type="submit" class="primary">บันทึกการแก้ไข</button></div></form>`;
-      window.OfficeBranch.mount(dialog.querySelector('form'),customer.office_code,{before:dialog.querySelector('[data-error]')});
+      window.OfficeBranch.mount(dialog.querySelector('form'),customer.office_code,{name:customer.office_name,before:dialog.querySelector('[data-error]')});
       let saving=false;const close=()=>{if(!saving)dialog.remove();};dialog.querySelector('[data-cancel]').onclick=close;dialog.addEventListener('cancel',e=>{e.preventDefault();close();});
       dialog.querySelector('form').onsubmit=async event=>{
         event.preventDefault();if(saving)return;const form=event.currentTarget,error=dialog.querySelector('[data-error]');

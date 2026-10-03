@@ -41,7 +41,7 @@ window.buildSalesPDF = async (company, doc, items) => {
   text(company.name || '-',32,true,issuerX,issuerWidth);
   text(window.DocumentAddress.format(company.address) || '-',24,false,issuerX,issuerWidth);
   text(`เลขประจำตัวผู้เสียภาษี ${company.tax_id || '-'}`,24,false,issuerX,issuerWidth);
-  if(doc.kind==='tax_invoice')text(window.OfficeBranch.label(doc.issuer_office_snapshot),24,false,issuerX,issuerWidth);
+  if(doc.kind==='tax_invoice')text(window.OfficeBranch.label(doc.issuer_office_snapshot,doc.issuer_office_name_snapshot),24,false,issuerX,issuerWidth);
   y=Math.max(y,margin+145);
   y += 16; rule(); text(titles[doc.kind] || 'เอกสาร', 32, true);
   text(`เลขที่ ${doc.document_number}`);
@@ -49,7 +49,7 @@ window.buildSalesPDF = async (company, doc, items) => {
   if (doc.status === 'draft') text('สถานะ: ร่าง');
   if (doc.status === 'paid') text('สถานะ: ชำระแล้ว');
   y += 14; text(`ลูกค้า: ${doc.customer_name_snapshot}`, 26, true);
-  text(window.DocumentAddress.format(doc.customer_address_snapshot) || '-'); text(`เลขประจำตัวผู้เสียภาษี ${doc.customer_tax_id_snapshot || '-'}`);if(doc.kind==='tax_invoice')text(window.OfficeBranch.label(doc.customer_office_snapshot));
+  text(window.DocumentAddress.format(doc.customer_address_snapshot) || '-'); text(`เลขประจำตัวผู้เสียภาษี ${doc.customer_tax_id_snapshot || '-'}`);if(doc.kind==='tax_invoice')text(window.OfficeBranch.label(doc.customer_office_snapshot,doc.customer_office_name_snapshot));
   if (doc.valid_until) text(`ยืนราคาถึง ${doc.valid_until}`);
   if (doc.due_date) text(`กำหนดชำระ ${doc.due_date}`);
   y += 14; rule();
