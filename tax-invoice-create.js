@@ -1,7 +1,7 @@
 (() => {
   const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value||'') && !isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0,10)===value;
-  const numberExample = date => validDate(date)?`IV${String(Number(date.slice(0,4))+543).slice(-2)}${date.slice(5,7)}-0001`:'IVปีเดือน-0001';
+  const numberExample = date => validDate(date)?`IV/${String(Number(date.slice(0,4))+543).slice(-2)}-00001`:'IV/ปี-00001';
   const candidates = (quotes,links) => quotes.filter(q=>window.QuotationTax.canIssue(q)&&!links.has(q.id));
   const prepare = (data,rows,customers,products,org,id) => {
     if(!org||!id)throw Error('กรุณาเข้าสู่ระบบใหม่');
@@ -58,7 +58,7 @@
       const numberingNotice=root.querySelector('h2').nextElementSibling;
       const due=root.querySelector('[name=expires]');due.name='dueDate';due.required=false;due.previousElementSibling.textContent='ครบกำหนดชำระ (ว่าง = วันที่เอกสาร)';
       const date=document.createElement('label');date.className='field';date.innerHTML=`<span>วันที่เอกสาร</span><input name="issueDate" type="date" min="2000-01-01" max="2199-12-31" required value="${window.QuotationEditor.issueDate()}">`;root.querySelector('.qe-grid').prepend(date);
-      const updateNumber=()=>{numberingNotice.textContent=`ตัวอย่างเลขที่ ${numberExample(date.querySelector('input').value)} • รันลำดับแยกแต่ละเดือนตามวันที่เอกสาร • กำหนดเลขจริงเมื่อบันทึก • เริ่มต้นค้างจ่าย`;};date.querySelector('input').addEventListener('input',updateNumber);updateNumber();
+      const updateNumber=()=>{numberingNotice.textContent=`ตัวอย่างรูปแบบ ${numberExample(date.querySelector('input').value)} • รันต่อจากเลขลำดับสูงสุดของปี พ.ศ. • กำหนดเลขจริงเมื่อบันทึก • เริ่มต้นค้างจ่าย`;};date.querySelector('input').addEventListener('input',updateNumber);updateNumber();
       root.querySelector('[name=deliveryTerms]').closest('label').remove();root.querySelector('[name=notes]').maxLength=4000;
       const submit=root.querySelector('button[value=default]');submit.textContent='บันทึกใบกำกับภาษี';
       const cancel=root.querySelector('button[value=cancel]');cancel.type='button';cancel.onclick=close;
