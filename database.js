@@ -356,7 +356,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>à
   modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
     const token=++openingDocument;
-    if(!['quotation','cash_bill'].includes(type)){const result=baseOpenForm(type);if(type==='customer')window.OfficeBranch.mount(document.querySelector('#modal-content'),null,{before:document.querySelector('#modal-content .form-actions')});return result;}
+    if(!['quotation','cash_bill'].includes(type)){const result=baseOpenForm(type);if(type==='customer')window.OfficeBranch.mount(document.querySelector('#modal-content'),'00000',{before:document.querySelector('#modal-content .form-actions')});return result;}
     if(!session)return login();
     const root=document.querySelector('#modal-content');
     if(!productsOrganizationReady||customersReadyOrg!==orgId){
