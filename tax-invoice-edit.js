@@ -58,7 +58,7 @@
    numberLabel.innerHTML='<span>เลขที่เอกสาร</span><input name="documentNumber" required maxlength="80" autocomplete="off"><small>ห้ามซ้ำกับเลขที่มีอยู่ รวมถึงในถังขยะ</small>';
    numberLabel.querySelector('input').value=doc.document_number;form.querySelector('.te-grid').prepend(numberLabel);
    form.querySelector('h2').nextElementSibling.textContent='แก้ไขเลขที่เอกสารได้ • คงอัตรา VAT เดิม • รหัสสินค้าไม่แสดงในแบบพิมพ์';
-   window.OfficeBranch.mount(form.querySelector('.te-grid'),doc.issuer_office_snapshot,{name:doc.issuer_office_name_snapshot,prefix:'issuerOffice',title:'สำนักงาน / สาขาของผู้ออกเอกสาร'});
+   window.OfficeBranch.mountHeadOffice(form.querySelector('.te-grid'),{prefix:'issuerOffice',title:'สำนักงานของผู้ออกเอกสาร'});
    window.OfficeBranch.mount(form.querySelector('.te-grid'),doc.customer_office_snapshot,{name:doc.customer_office_name_snapshot,prefix:'customerOffice',title:'สำนักงาน / สาขาของลูกค้า'});
    const customerSelect=form.querySelector('[name=customerId]');
    customerSelect.onchange=()=>{const selected=catalog.customers.find(c=>c.id===customerSelect.value);const code=customerSelect.value===doc.customer_id?doc.customer_office_snapshot:selected?.officeCode;form.querySelector('[name=customerOfficeType]').value=code==null?'':code==='00000'?'head':'branch';form.querySelector('[name=customerOfficeNumber]').value=code&&code!=='00000'?code:'';form.querySelector('[name=customerOfficeName]').value=(customerSelect.value===doc.customer_id?doc.customer_office_name_snapshot:selected?.officeName)||'';form.querySelector('[name=customerOfficeType]').onchange();};

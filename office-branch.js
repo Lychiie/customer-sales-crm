@@ -21,12 +21,12 @@
   if(before)before.before(box);else root.append(box);
   return box;
  };
- // Legacy invoices predate office snapshots. Resolve missing offices for this
- // preview only; never overwrite a recorded office or write historical data.
+ // Company is always HQ by user policy. Missing customer offices fall back
+ // to the master for preview only; recorded customer offices remain unchanged.
  const resolve=async(request,org,doc,company)=>{
   if(doc.kind!=='tax_invoice')return doc;
   const result={...doc};
-  if(!result.issuer_office_snapshot&&company?.office_code){result.issuer_office_snapshot=company.office_code;result.issuer_office_name_snapshot=company.office_name||null;}
+  result.issuer_office_snapshot='00000';result.issuer_office_name_snapshot=null;
   if(!result.customer_office_snapshot&&doc.customer_id){
    const rows=await request(`/rest/v1/customers?organization_id=eq.${encodeURIComponent(org)}&id=eq.${encodeURIComponent(doc.customer_id)}&select=id,office_code,office_name&limit=1`);
    const customer=rows?.[0];
@@ -34,5 +34,12 @@
   }
   return result;
  };
- window.OfficeBranch={normalize,label,read,readName,mount,resolve};
+ const mountHeadOffice=(root,{prefix='office',title='สำนักงานของบริษัท',before}={})=>{
+  const box=document.createElement('div');box.className='field';box.style.cssText='margin:14px 0;display:grid;gap:8px';
+  const heading=document.createElement('span');heading.textContent=title;
+  const value=document.createElement('strong');value.textContent='สำนักงานใหญ่';
+  const input=document.createElement('input');input.type='hidden';input.name=prefix+'Type';input.value='head';
+  box.append(heading,value,input);if(before)before.before(box);else root.append(box);return box;
+ };
+ window.OfficeBranch={normalize,label,read,readName,mount,mountHeadOffice,resolve};
 })();
