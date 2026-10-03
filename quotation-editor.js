@@ -22,7 +22,7 @@
       const product = products.find(p => p.id === row.variantId);
       if (!product) throw Error(`กรุณาเลือกสินค้าในรายการที่ ${index+1}`);
       const quantity=Number(row.quantity), price=Number(row.unitPrice), rate=Number(row.discountRate);
-      if ([row.quantity,row.unitPrice,row.discountRate].some(v=>String(v??'').trim()==='') || ![quantity,price,rate].every(Number.isFinite) || quantity<=0 || price<0 || rate<0 || rate>100) throw Error(`ตรวจจำนวน ราคา และส่วนลด 0–100% ในรายการที่ ${index+1}`);
+      if ([row.quantity,row.unitPrice,row.discountRate].some(v=>String(v??'').trim()==='') || ![quantity,price,rate].every(Number.isFinite) || !Number.isSafeInteger(quantity) || quantity<=0 || price<0 || rate<0 || rate>100) throw Error(`ตรวจจำนวน ราคา และส่วนลด 0–100% ในรายการที่ ${index+1}`);
       const gross=round(quantity*price), discount=round(gross*rate/100);
       if (!Number.isFinite(gross) || gross>=1e12) throw Error('ยอดรายการสินค้าเกินขอบเขตที่รองรับ');
       return {position:index+1,product_variant_id:product.id,sku_snapshot:product.sku,product_name_snapshot:product.name,specification_snapshot:String(row.specification??product.size??''),unit_snapshot:product.unit||'ชิ้น',quantity,unit_price:price,discount_amount:discount,line_total:round(gross-discount)};
@@ -58,7 +58,7 @@
     };
     const add=()=>{
       const row=document.createElement('div');row.className='qe-row';
-      row.innerHTML=`<div class="qe-top"><strong></strong><button type="button" class="ghost" data-remove>นำรายการนี้ออก</button></div><div data-sku-picker></div><input type="hidden" data-variant><label class="field"><span>รายละเอียด / ขนาดที่แสดงในเอกสาร</span><textarea data-spec rows="2"></textarea></label><div class="qe-numbers"><label class="field"><span>จำนวน</span><input data-qty type="number" min="0.001" step="0.001" value="1" required></label><label class="field"><span>ราคาต่อหน่วย (บาท)</span><input data-price type="number" min="0" step="0.01" value="0" required></label><label class="field"><span>ส่วนลด (%)</span><input data-discount type="number" min="0" max="100" step="0.01" value="0" required></label></div>`;
+      row.innerHTML=`<div class="qe-top"><strong></strong><button type="button" class="ghost" data-remove>นำรายการนี้ออก</button></div><div data-sku-picker></div><input type="hidden" data-variant><label class="field"><span>รายละเอียด / ขนาดที่แสดงในเอกสาร</span><textarea data-spec rows="2"></textarea></label><div class="qe-numbers"><label class="field"><span>จำนวน</span><input data-qty type="number" min="1" step="1" value="1" required></label><label class="field"><span>ราคาต่อหน่วย (บาท)</span><input data-price type="number" min="0" step="0.01" value="0" required></label><label class="field"><span>ส่วนลด (%)</span><input data-discount type="number" min="0" max="100" step="0.01" value="0" required></label></div>`;
       window.ProductCodePicker.mount(row.querySelector('[data-sku-picker]'),products,p=>{if(productLookup&&p){const i=products.findIndex(item=>item.id===p.id);if(i<0)products.push(p);else products[i]=p;}row.querySelector('[data-variant]').value=p?.id??'';row.querySelector('[data-price]').value=p?.price??0;row.querySelector('[data-spec]').value=p?.size??'';update();},{lookup:productLookup});
       row.querySelector('[data-remove]').onclick=()=>{row.remove();update();};
       row.addEventListener('input',update);container.append(row);update();
