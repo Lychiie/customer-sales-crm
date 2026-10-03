@@ -62,7 +62,7 @@
     if(orgId!==customerOrg)return;
     customersReadyOrg=customerOrg;
     window.DeliveryNotes?.configureEditor(customerOrg,rows,query=>lookupProductCodes(query,customerOrg));
-    state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
+    state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', officeCode:customer.office_code, phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
   // Document editors share only customer metadata and an on-demand SKU lookup.
   const documentEditorCatalog=async()=>{
@@ -214,7 +214,7 @@
     }finally{productDeleteBusy=false;renderProductTrash();}
   });
   const syncCompanyProfile = async () => {
-    const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,phone,vat_rate&limit=1`))[0];
+    const organization = (await request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,phone,vat_rate,office_code&limit=1`))[0];
     if (!organization) return;
     companyVatRate=Number(organization.vat_rate ?? 7);
     const settings = document.querySelector('#company-profile');
@@ -356,7 +356,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
   modal.addEventListener('cancel', event => { if (savingQuotation) event.preventDefault(); });
   window.openForm = async (type) => {
     const token=++openingDocument;
-    if(!['quotation','cash_bill'].includes(type))return baseOpenForm(type);
+    if(!['quotation','cash_bill'].includes(type)){const result=baseOpenForm(type);if(type==='customer')window.OfficeBranch.mount(document.querySelector('#modal-content'),null,{before:document.querySelector('#modal-content .form-actions')});return result;}
     if(!session)return login();
     const root=document.querySelector('#modal-content');
     if(!productsOrganizationReady||customersReadyOrg!==orgId){
@@ -498,7 +498,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       if (modal.dataset.type === 'login') { session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(data) }); localStorage.setItem('flowbill-session', JSON.stringify(session)); await syncAll(); modal.close(); label(); }
-      else if (modal.dataset.type === 'customer' && session && orgId) { await request('/rest/v1/customers', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: orgId, name: data.name, contact_name: data.contact || null, tax_id: data.taxId || null, phone: data.phone || null, credit_term_days: parseInt(data.terms) || 30 }) }); await syncCustomers(); render(); modal.close(); }
+      else if (modal.dataset.type === 'customer' && session && orgId) { await request('/rest/v1/customers', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: orgId, office_code:window.OfficeBranch.read(data), name: data.name, contact_name: data.contact || null, tax_id: data.taxId || null, phone: data.phone || null, credit_term_days: parseInt(data.terms) || 30 }) }); await syncCustomers(); render(); modal.close(); }
       else if (modal.dataset.type === 'product' && session && orgId) { await addProduct(data); modal.close(); }
       else if (modal.dataset.type === 'quotation' && session && orgId) {
         if (savingQuotation) return;
@@ -523,7 +523,7 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
     const doc = (await request(`/rest/v1/documents?organization_id=eq.${orgId}&document_number=eq.${encodeURIComponent(number)}&select=*&limit=1`))[0];
     if (!doc) throw new Error('ไม่พบเอกสาร กรุณาเข้าสู่ระบบแล้วลองใหม่');
     const [companies, items] = await Promise.all([
-      request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,payment_account&limit=1`),
+      request(`/rest/v1/organizations?id=eq.${orgId}&select=name,tax_id,address,payment_account,office_code&limit=1`),
       doc.kind === 'billing_note'
         ? window.BillingDocuments.resolve(request,orgId,doc)
         : request(`/rest/v1/document_items?document_id=eq.${doc.id}&select=*&order=position.asc`)
@@ -555,8 +555,8 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       @page{size:A4;margin:12mm}
       @media print{body:has(> #document-preview):not(:has(> #dn-preview)):not(:has(> #continuous-preview)) > *:not(#document-preview){display:none!important}#document-preview{position:static;background:white;overflow:visible}#document-preview .print-tools{display:none}#document-preview .paper{width:auto;max-width:none;min-height:0;margin:0;padding:0}#document-preview tr,#document-preview .totals,#document-preview .signatures{break-inside:avoid}#document-preview thead{display:table-header-group}}
     </style><div class="print-tools"><button type="button" data-print-now>พิมพ์ / บันทึก PDF</button><button type="button" data-print-close>กลับไปยังรายการ</button><span>เลือก Save as PDF หรือ บันทึกเป็น PDF ในหน้าพิมพ์</span></div>
-    <article class="paper"><header class="print-head"><div><div class="print-brand"><img class="print-company-logo" src="company-logo.png" alt="โลโก้บริษัท"><h2>${e(company.name)}</h2></div><div class="address">${e(window.DocumentAddress.format(company.address) || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p></div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
-    <div class="address"><strong>ลูกค้า: ${e(doc.customer_name_snapshot)}</strong><br>${e(window.DocumentAddress.format(doc.customer_address_snapshot) || '-')}<br>เลขประจำตัวผู้เสียภาษี ${e(doc.customer_tax_id_snapshot || '-')}</div>
+    <article class="paper"><header class="print-head"><div><div class="print-brand"><img class="print-company-logo" src="company-logo.png" alt="โลโก้บริษัท"><h2>${e(company.name)}</h2></div><div class="address">${e(window.DocumentAddress.format(company.address) || '-')}</div><p>เลขประจำตัวผู้เสียภาษี ${e(company.tax_id || '-')}</p>${doc.kind==='tax_invoice'?`<p>${e(window.OfficeBranch.label(doc.issuer_office_snapshot))}</p>`:''}</div><div><h1>${e(title)}</h1><p>เลขที่ ${e(doc.document_number)}</p><p>วันที่ ${e(date(doc.issue_date))}</p><p>${doc.status === 'draft' ? 'สถานะ: ร่าง' : doc.status === 'paid' ? 'สถานะ: ชำระแล้ว' : ''}</p></div></header>
+    <div class="address"><strong>ลูกค้า: ${e(doc.customer_name_snapshot)}</strong><br>${e(window.DocumentAddress.format(doc.customer_address_snapshot) || '-')}<br>เลขประจำตัวผู้เสียภาษี ${e(doc.customer_tax_id_snapshot || '-')}${doc.kind==='tax_invoice'?`<br>${e(window.OfficeBranch.label(doc.customer_office_snapshot))}`:''}</div>
     ${doc.valid_until ? `<p>ยืนราคาถึง ${e(date(doc.valid_until))}</p>` : ''}${doc.due_date ? `<p>กำหนดชำระ ${e(date(doc.due_date))}</p>` : ''}${doc.kind==='cash_bill'?`<p><strong>เงื่อนไขชำระเงิน:</strong> ${e(window.QuotationEditor.decode(doc.notes).paymentTerms||'เงินสด')}</p>`:''}
     <table><thead><tr><th style="width:7%">ลำดับ</th><th style="width:39%">สินค้า / ขนาด</th><th style="width:14%">จำนวน</th><th class="number" style="width:20%">ราคาต่อหน่วย</th><th class="number" style="width:20%">รวม</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td><td class="item-description">${e([item.product_name_snapshot,item.specification_snapshot].filter(value => value != null && String(value).trim()).join(' '))}</td><td>${e(item.quantity)} ${e(item.unit_snapshot)}</td><td class="number">${money(item.unit_price)}</td><td class="number">${money(item.line_total)}</td></tr>`).join('')}</tbody></table>
     <div class="totals"><p><span>รวมก่อนส่วนลด</span><span>${money(doc.subtotal)}</span></p><p><span>ส่วนลด</span><span>${money(doc.discount_amount)}</span></p><p><span>มูลค่าก่อน VAT</span><span>${money(doc.taxable_amount)}</span></p><p><span>VAT ${e(doc.vat_rate)}%</span><span>${money(doc.vat_amount)}</span></p><p><strong>ยอดสุทธิ (บาท)</strong><strong>${money(doc.grand_total)}</strong></p></div>

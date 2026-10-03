@@ -33,7 +33,7 @@
   return {p_org:doc.organization_id,p_id:doc.id,p_number:doc.document_number,p_expected_updated_at:doc.updated_at,p_customer:data.customerId||null,p_issue:data.issueDate,p_due:data.dueDate,p_terms:data.paymentTerms||'',p_notes:data.notes||'',p_items:items.map(i=>({...i,quantity:Number(i.quantity),unit_price:Number(i.unit_price),discount_amount:Number(i.discount_amount)}))};
  };
  const save=async(request,p)=>{
-  const result=await request('/rest/v1/rpc/edit_tax_invoice_numbered',{method:'POST',body:JSON.stringify(p)});
+  const result=await request('/rest/v1/rpc/edit_tax_invoice_offices',{method:'POST',body:JSON.stringify(p)});
   if(result?.id!==p.p_id||result.document_number!==(p.p_new_number||p.p_number)||result.updated!==true||!result.updated_at)throw Error('ยังยืนยันผลบันทึกไม่ได้ กรุณาปิดแล้วเปิดเอกสารตรวจสอบก่อนลองใหม่');
   return result;
  };
@@ -58,6 +58,10 @@
    numberLabel.innerHTML='<span>เลขที่เอกสาร</span><input name="documentNumber" required maxlength="80" autocomplete="off"><small>ห้ามซ้ำกับเลขที่มีอยู่ รวมถึงในถังขยะ</small>';
    numberLabel.querySelector('input').value=doc.document_number;form.querySelector('.te-grid').prepend(numberLabel);
    form.querySelector('h2').nextElementSibling.textContent='แก้ไขเลขที่เอกสารได้ • คงอัตรา VAT เดิม • รหัสสินค้าไม่แสดงในแบบพิมพ์';
+   window.OfficeBranch.mount(form.querySelector('.te-grid'),doc.issuer_office_snapshot,{prefix:'issuerOffice',title:'สำนักงาน / สาขาของผู้ออกเอกสาร'});
+   window.OfficeBranch.mount(form.querySelector('.te-grid'),doc.customer_office_snapshot,{prefix:'customerOffice',title:'สำนักงาน / สาขาของลูกค้า'});
+   const customerSelect=form.querySelector('[name=customerId]');
+   customerSelect.onchange=()=>{const selected=catalog.customers.find(c=>c.id===customerSelect.value);const code=customerSelect.value===doc.customer_id?doc.customer_office_snapshot:selected?.officeCode;form.querySelector('[name=customerOfficeType]').value=code==null?'':code==='00000'?'head':'branch';form.querySelector('[name=customerOfficeNumber]').value=code&&code!=='00000'?code:'';form.querySelector('[name=customerOfficeType]').onchange();};
    const read=()=>[...lines.children].map(row=>({existing_item_id:row.dataset.existing||null,variant_id:row.dataset.variant||null,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unit_price:row.querySelector('[data-price]').value,discount_amount:discountAmount(row.querySelector('[data-qty]').value,row.querySelector('[data-price]').value,row.querySelector('[data-discount]').value,row.originalDiscount)}));
    const update=()=>{try{const t=totals(read(),doc.vat_rate);form.querySelector('[data-total]').textContent=`รวม ${money(t.subtotal)} · ส่วนลด ${money(t.discount)} · VAT ${doc.vat_rate}% ${money(t.vat)} · ยอดสุทธิ ${money(t.total)} บาท`;}catch(e){form.querySelector('[data-total]').textContent=e.message;}};
    const add=item=>{
@@ -72,7 +76,7 @@
     event.preventDefault();if(busy)return;const error=form.querySelector('[data-error]');error.textContent='';
     try{
      if(ctx!==context)throw Error('องค์กรเปลี่ยนแล้ว กรุณาเปิดเอกสารใหม่');
-     const data=Object.fromEntries(new FormData(form)),p=payload(doc,data,read());p.p_new_number=window.DocumentNumber.normalize(data.documentNumber);if(!p.p_new_number)throw Error('กรุณาระบุเลขที่เอกสาร');busy=true;
+     const data=Object.fromEntries(new FormData(form)),p=payload(doc,data,read());p.p_issuer_office=window.OfficeBranch.read(data,'issuerOffice');p.p_customer_office=window.OfficeBranch.read(data,'customerOffice');p.p_new_number=window.DocumentNumber.normalize(data.documentNumber);if(!p.p_new_number)throw Error('กรุณาระบุเลขที่เอกสาร');busy=true;
      const fields=[...form.querySelectorAll('button,input,select,textarea')];fields.forEach(e=>e.disabled=true);
      try{await save(ctx.request,p);}catch(e){fields.forEach(el=>el.disabled=false);throw e;}
      dialog.close();try{await ctx.refresh();}catch{alert('บันทึกการแก้ไขแล้ว แต่โหลดรายการใหม่ไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ');}
