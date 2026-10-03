@@ -1,6 +1,15 @@
 (() => {
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const round=n=>Math.round((n+Number.EPSILON)*100)/100;
+ const discountRate=item=>{
+  const gross=round(Number(item?.quantity||0)*Number(item?.unit_price||0));
+  return gross>0?Number((Number(item.discount_amount||0)/gross*100).toFixed(6)):0;
+ };
+ const discountAmount=(quantity,price,rate,original)=>{
+  if(String(rate??'').trim()===''||!Number.isFinite(Number(rate))||Number(rate)<0||Number(rate)>100)throw Error('ส่วนลดต้องอยู่ระหว่าง 0–100%');
+  if(original&&Number(quantity)===Number(original.quantity)&&Number(price)===Number(original.unit_price)&&Number(rate)===discountRate(original))return Number(original.discount_amount||0);
+  return round(round(Number(quantity)*Number(price))*Number(rate)/100);
+ };
  const money=n=>Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
  const dateOK=v=>/^\d{4}-\d{2}-\d{2}$/.test(v||'')&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
  const totals=(items)=>{
@@ -49,12 +58,12 @@
    numberLabel.innerHTML='<span>เลขที่เอกสาร</span><input name="documentNumber" required maxlength="80" autocomplete="off"><small>แก้ไขได้ แต่ห้ามซ้ำกับเอกสารที่มีอยู่ รวมถึงในถังขยะ</small>';
    numberLabel.querySelector('input').value=doc.document_number;form.querySelector('.te-grid').prepend(numberLabel);
    form.querySelector('h2').nextElementSibling.textContent='แก้เลขที่บิลเดิมได้ • ไม่คิด VAT • รหัสสินค้าไม่แสดงในแบบพิมพ์';
-   const read=()=>[...lines.children].map(row=>({existing_item_id:row.dataset.existing||null,variant_id:row.dataset.variant||null,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unit_price:row.querySelector('[data-price]').value,discount_amount:row.querySelector('[data-discount]').value}));
+   const read=()=>[...lines.children].map(row=>({existing_item_id:row.dataset.existing||null,variant_id:row.dataset.variant||null,specification:row.querySelector('[data-spec]').value,quantity:row.querySelector('[data-qty]').value,unit_price:row.querySelector('[data-price]').value,discount_amount:discountAmount(row.querySelector('[data-qty]').value,row.querySelector('[data-price]').value,row.querySelector('[data-discount]').value,row.originalDiscount)}));
    const update=()=>{try{const t=totals(read(),0);form.querySelector('[data-total]').textContent=`รวม ${money(t.subtotal)} · ส่วนลด ${money(t.discount)} · ยอดสุทธิ ${money(t.total)} บาท`;}catch(e){form.querySelector('[data-total]').textContent=e.message;}};
    const add=item=>{
-    const row=document.createElement('div');row.className='te-line';row.dataset.existing=item?.id||'';
-    row.innerHTML=`<div class="te-top"><strong data-name>${esc(item?.product_name_snapshot||'สินค้าใหม่')}</strong><button type="button" class="ghost" data-remove>นำรายการออก</button></div><div data-picker></div>${item?'<button type="button" class="ghost" data-change>เปลี่ยนสินค้า</button>':''}<label class="field"><span>รายละเอียด / ขนาดในเอกสาร</span><textarea data-spec maxlength="2000">${esc(item?.specification_snapshot||'')}</textarea></label><div class="te-numbers"><label class="field"><span>จำนวน</span><input data-qty type="number" required min="0.001" step="0.001" value="${esc(item?.quantity??1)}"></label><label class="field"><span>ราคาต่อหน่วย (บาท)</span><input data-price type="number" required min="0" step="0.01" value="${esc(item?.unit_price??0)}"></label><label class="field"><span>ส่วนลด (บาท)</span><input data-discount type="number" required min="0" step="0.01" value="${esc(item?.discount_amount??0)}"></label></div>`;
-    const picker=()=>{row.dataset.existing='';row.querySelector('[data-name]').textContent='เลือกสินค้า';window.ProductCodePicker.mount(row.querySelector('[data-picker]'),catalog.products,p=>{row.dataset.variant=p?.id||'';row.querySelector('[data-name]').textContent=p?.name||'เลือกสินค้า';row.querySelector('[data-price]').value=p?.price??0;row.querySelector('[data-spec]').value=p?.size||'';row.querySelector('[data-discount]').value=0;update();},{lookup:catalog.lookupProducts});row.querySelector('[data-change]')?.remove();update();};
+    const row=document.createElement('div');row.className='te-line';row.dataset.existing=item?.id||'';row.originalDiscount=item||null;
+    row.innerHTML=`<div class="te-top"><strong data-name>${esc(item?.product_name_snapshot||'สินค้าใหม่')}</strong><button type="button" class="ghost" data-remove>นำรายการออก</button></div><div data-picker></div>${item?'<button type="button" class="ghost" data-change>เปลี่ยนสินค้า</button>':''}<label class="field"><span>รายละเอียด / ขนาดในเอกสาร</span><textarea data-spec maxlength="2000">${esc(item?.specification_snapshot||'')}</textarea></label><div class="te-numbers"><label class="field"><span>จำนวน</span><input data-qty type="number" required min="0.001" step="0.001" value="${esc(item?.quantity??1)}"></label><label class="field"><span>ราคาต่อหน่วย (บาท)</span><input data-price type="number" required min="0" step="0.01" value="${esc(item?.unit_price??0)}"></label><label class="field"><span>ส่วนลด (%)</span><input data-discount type="number" required min="0" max="100" step="any" value="${esc(discountRate(item))}"></label></div>`;
+    const picker=()=>{row.originalDiscount=null;row.dataset.existing='';row.querySelector('[data-name]').textContent='เลือกสินค้า';window.ProductCodePicker.mount(row.querySelector('[data-picker]'),catalog.products,p=>{row.dataset.variant=p?.id||'';row.querySelector('[data-name]').textContent=p?.name||'เลือกสินค้า';row.querySelector('[data-price]').value=p?.price??0;row.querySelector('[data-spec]').value=p?.size||'';row.querySelector('[data-discount]').value=0;update();},{lookup:catalog.lookupProducts});row.querySelector('[data-change]')?.remove();update();};
     row.querySelector('[data-remove]').onclick=()=>{row.remove();update();};row.addEventListener('input',update);lines.append(row);
     if(item)row.querySelector('[data-change]').onclick=picker;else picker();update();
    };
@@ -81,5 +90,5 @@
   });
  };
  new MutationObserver(mount).observe(document.querySelector('main'),{childList:true,subtree:true});
- window.CashBillEdit={totals,payload,save,open,configure(request,org,catalog,refresh){if(!context||context.org!==org)context={request,org,catalog,refresh};else Object.assign(context,{request,catalog,refresh});mount();}};
+ window.CashBillEdit={discountRate,discountAmount,totals,payload,save,open,configure(request,org,catalog,refresh){if(!context||context.org!==org)context={request,org,catalog,refresh};else Object.assign(context,{request,catalog,refresh});mount();}};
 })();
