@@ -64,6 +64,13 @@
     window.DeliveryNotes?.configureEditor(customerOrg,rows,query=>lookupProductCodes(query,customerOrg));
     state.customers = rows.map((customer) => ({ id: customer.id, name: customer.name, address: customer.billing_address || customer.address || '', contact: customer.contact_name || '-', taxId: customer.tax_id || '-', phone: customer.phone || '-', terms: customer.credit_term_days ? `เครดิต ${customer.credit_term_days} วัน` : 'เงินสด', sales: '฿ 0' }));
   };
+  // Document editors share only customer metadata and an on-demand SKU lookup.
+  const documentEditorCatalog=async()=>{
+    const actionOrg=orgId;
+    if(customersReadyOrg!==actionOrg)await syncCustomers();
+    if(orgId!==actionOrg)throw Error('องค์กรเปลี่ยน กรุณาเปิดเอกสารใหม่');
+    return {customers:state.customers.slice(),products:[],lookupProducts:query=>lookupProductCodes(query,actionOrg)};
+  };
   // A new tax invoice only needs the SKU being entered, not the full catalog.
   const lookupProductCodes=async(value,targetOrg=orgId)=>{
     const q=String(value??'').trim().toUpperCase();
@@ -310,10 +317,10 @@ document.querySelector('#invoices').innerHTML = `<div class="page-toolbar"><h2>�
       productsOrganizationReady=true;render();loadVisibleProducts();return;
     }
     window.CompanyDashboard?.configure(request,orgId);
-    window.ProductCodePicker?.configure(async()=>{await ensureProducts();return state.products;});
-    window.TaxInvoiceEdit?.configure(request,orgId,async()=>{await Promise.all([ensureProducts(),syncCustomers()]);return {customers:state.customers,products:state.products};},async()=>{await syncAll();await window.TaxInvoiceControl.invalidate();});
-    window.CashBillEdit?.configure(request,orgId,async()=>{const actionOrg=orgId;await syncCustomers();return {customers:state.customers,products:[],lookupProducts:query=>lookupProductCodes(query,actionOrg)};},async()=>{await syncCashBills();});
-    window.QuotationEdit?.configure(request,orgId,async()=>{const actionOrg=orgId;await syncCustomers();return {customers:state.customers,products:[],lookupProducts:query=>lookupProductCodes(query,actionOrg)};},async()=>{await syncQuotations();state.quotations.forEach(quote=>{quote.taxInvoiceNumber=quotationTaxInvoices.get(quote.id)?.document_number||null;if(quote.statusCode==='approved')quote.status=quote.taxInvoiceNumber?'ออกใบกำกับภาษีแล้ว':'รอออกใบกำกับภาษี';});save();render();renderDocumentActions();addPrintButtons();});
+    window.ProductCodePicker?.configure(async()=>state.products);
+    window.TaxInvoiceEdit?.configure(request,orgId,documentEditorCatalog,refreshTaxInvoiceViews);
+    window.CashBillEdit?.configure(request,orgId,documentEditorCatalog,async()=>{await syncCashBills();});
+    window.QuotationEdit?.configure(request,orgId,documentEditorCatalog,async()=>{await syncQuotations();state.quotations.forEach(quote=>{quote.taxInvoiceNumber=quotationTaxInvoices.get(quote.id)?.document_number||null;if(quote.statusCode==='approved')quote.status=quote.taxInvoiceNumber?'ออกใบกำกับภาษีแล้ว':'รอออกใบกำกับภาษี';});save();render();renderDocumentActions();addPrintButtons();});
     window.CustomerEdit?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
     window.CustomerDelete?.configure(request,orgId,async()=>{await syncCustomers();save();render();document.querySelector('#customer-search').dispatchEvent(new Event('input'));});
     window.DocumentDelete?.configure(request,orgId,async kind=>{
