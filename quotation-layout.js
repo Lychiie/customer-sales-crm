@@ -37,10 +37,10 @@
     'ถ้าระบุมาว่าพ่นสี ทางบริษัทฯ จะถือว่าพ่นสีขาวตามมาตรฐานทางบริษัทฯ'
   ];
   const build=(company,doc,items,measure,logo=null)=>{
-    const billing=doc.kind==='billing_note',cash=doc.kind==='cash_bill';
+    const billing=doc.kind==='billing_note',cash=doc.kind==='cash_bill',taxInvoice=doc.kind==='tax_invoice';
     if(cash){const net=Math.round((Number(doc.subtotal)-Number(doc.discount_amount||0))*100)/100;doc={...doc,vat_rate:0,vat_amount:0,taxable_amount:net,grand_total:net};}
     const INK=billing?'#65516f':'#245b57',LINE=billing?'#d8cedd':'#c5d6d3',MUTED=billing?'#776b7f':'#526d69',HEADER=billing?'#f3eef5':'#edf5f3';
-    const title=billing?'ใบวางบิล':cash?'บิลเงินสด':'ใบเสนอราคา',english=billing?'BILLING NOTE':cash?'CASH BILL':'QUOTATION';
+    const title=billing?'ใบวางบิล':cash?'บิลเงินสด':taxInvoice?'ใบกำกับภาษี':'ใบเสนอราคา',english=billing?'BILLING NOTE':cash?'CASH BILL':taxInvoice?'TAX INVOICE':'QUOTATION';
     if(billing&&items.some(item=>item.kind!=='tax_invoice'||!item.document_number||item.grand_total==null||!Number.isFinite(Number(item.grand_total))||Number(item.grand_total)<0))throw Error('รายการใบวางบิลต้องเชื่อมกับใบกำกับภาษีที่ออกแล้ว');
     const billingTotal=billing?items.reduce((sum,item)=>sum+Math.round(Number(item.grand_total)*100),0)/100:0;
     const details=window.QuotationEditor?.decode(doc.notes)||{paymentTerms:'',deliveryTerms:'',notes:doc.notes||'',rates:[]};
@@ -109,6 +109,7 @@
         cy+=block(company.name||'-',nameX,cy,nameWidth,26,true)+14;
         cy+=block(window.DocumentAddress.format(company.address)||'-',nameX,cy,nameWidth,18,false,MUTED)+13;
         cy+=block('เลขประจำตัวผู้เสียภาษี '+(company.tax_id||'-'),nameX,cy,nameWidth,16,false,MUTED);
+        if(taxInvoice)cy+=block(window.OfficeBranch.label(doc.issuer_office_snapshot,doc.issuer_office_name_snapshot),nameX,cy+4,nameWidth,16,false,MUTED)+4;
       }
       cy=Math.max(cy,78+logoHeight);
       text(title,R,76,39,true,'right');text(english,R,128,17,false,'right',MUTED);
@@ -119,7 +120,10 @@
       const customerLines=wrap(doc.customer_name_snapshot||'-',595,21,true,measure);
       const address=wrap(window.DocumentAddress.format(doc.customer_address_snapshot)||'-',595,18,false,measure);
       const tax=wrap('เลขประจำตัวผู้เสียภาษี '+(doc.customer_tax_id_snapshot||'-'),595,16,false,measure);
-      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:cash?[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['วันที่ครบกำหนดชำระเงิน',date(billingDueDate(doc.issue_date,details.paymentTerms)||doc.issue_date)],['เงื่อนไขชำระเงิน',details.paymentTerms||'เงินสด']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดจัดส่งสินค้า',details.deliveryTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
+      if(taxInvoice)tax.push(...wrap(window.OfficeBranch.label(doc.customer_office_snapshot,doc.customer_office_name_snapshot),595,16,false,measure));
+      const cashDue=billingDueDate(doc.issue_date,details.paymentTerms)||doc.issue_date;
+      const detailRows=(billing?[['เอกสารที่นำมาวางบิล',items.length+' ใบกำกับภาษี'],['ครบกำหนดชำระ', 'ตามวันที่ในแต่ละรายการ'],['เงื่อนไขชำระเงิน / เครดิต',details.paymentTerms||'-']]:cash?[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['วันที่ครบกำหนดชำระเงิน',date(cashDue)],['เงื่อนไขชำระเงิน',details.paymentTerms||'เงินสด']]:[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-'],['กำหนดจัดส่งสินค้า',details.deliveryTerms||'-']]).map(([label,value])=>({label,lines:wrap(value,billing?365:195,18,true,measure)}));
+      if(taxInvoice){detailRows.splice(0,detailRows.length,...[['เลขที่เอกสาร',doc.document_number||'ตัวอย่าง'],['วันที่',date(doc.issue_date)],['ครบกำหนดชำระ',date(doc.due_date)],['เงื่อนไขการชำระเงิน',details.paymentTerms||'-']].map(([label,value])=>({label,lines:wrap(value,195,18,true,measure)})));}
       const detailHeight=billing?55+detailRows.reduce((h,row)=>h+25+row.lines.length*27+12,0):28+detailRows.reduce((h,row)=>h+Math.max(1,row.lines.length)*27+16,0);
       const boxY=headBottom+30,boxH=Math.max(detailHeight,65+customerLines.length*32+address.length*28+tax.length*25);
       if(boxY+boxH>900)throw Error('ข้อมูลหัวเอกสารหรือที่อยู่ยาวเกินพื้นที่'+title+' กรุณาตรวจข้อมูลก่อนพิมพ์');
@@ -152,7 +156,7 @@
     if(!items.length){rect(L,y,R-L,55);text(billing?'ไม่มีใบกำกับภาษีที่เชื่อมอยู่':'ไม่มีรายการสินค้า',L+20,y+17,18,false,'left',MUTED);y+=55;}
     if(cash){
       const noteLines=String(details.notes||'').trim()?wrap(String(details.notes).trim(),590,16,false,measure).length:0;
-      const footerHeight=Math.max(180,39+noteLines*25)+28+161;
+      const footerHeight=39+noteLines*25+(noteLines?12:0)+185+28+161;
       const tableBottom=1630-24-footerHeight;
       const blankRows=Math.max(0,Math.ceil((tableBottom-y)/32)-2);
       for(let row=0;row<blankRows;row++){widths.forEach((w,i)=>rect(xs[i],y,w,32));y+=32;}
@@ -192,15 +196,15 @@
       y+=bottomHeight+50;
     }
     const extraNote=String(details.notes||'').trim();
-    const noteText=billing?'':cash?extraNote:[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
+    const noteText=billing?'':cash||taxInvoice?extraNote:[...quotationRemarks,...(extraNote?[extraNote]:[])].join('\n');
+    const cashPaymentLines=cash?['ชื่อบัญชี  นางสาวเบญจมาศ สุภาษี','ธนาคารกสิกรไทย  เลขที่ 014-8-15927-0','ธนาคารกรุงเทพ  เลขที่ 030-7-231852','ธนาคารเกียรตินาคิน  เลขที่ 208-4-77636-5']:[];
     const amounts=billing?[]:cash?[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]]:[['รวมก่อนส่วนลด',doc.subtotal],['ส่วนลด',doc.discount_amount],['มูลค่าก่อน VAT',doc.taxable_amount],['VAT '+(doc.vat_rate??0)+'%',doc.vat_amount],['ยอดสุทธิ / TOTAL',doc.grand_total]];
     if(!billing){
       let notes=noteText?wrap(noteText,590,16,false,measure):[],continued=false;
-      const standardLines=cash?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
-      const fixedLeftHeight=39+18+39+standardLines.length*25;
+      const standardLines=cash||taxInvoice?[]:productionStandards.flatMap(value=>wrap(value,590,16,false,measure));
+      const fixedLeftHeight=cash?224+(notes.length?12:0):taxInvoice?225:39+18+39+standardLines.length*25;
       while(true){
-        const availableFooterHeight=1630-y-28-161;
-        const finalCapacity=cash?(availableFooterHeight<180?-1:Math.floor((availableFooterHeight-39)/25)):Math.floor((availableFooterHeight-fixedLeftHeight)/25);
+        const finalCapacity=Math.floor((1630-y-28-161-fixedLeftHeight)/25);
         if(finalCapacity>=notes.length)break;
         if(!notes.length){start();y+=20;continue;}
         const pageCapacity=Math.floor((1600-y-39)/25);
@@ -214,13 +218,25 @@
       if(!cash||notes.length)text('หมายเหตุ / REMARKS'+(continued?' (ต่อ)':''),L,sectionY+7,17,true,'left',INK);
       notes.forEach((value,i)=>text(value,L,sectionY+39+i*25,16));
       const productionY=sectionY+39+notes.length*25+18;
-      if(!cash){text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));}
-      const leftHeight=cash?Math.max(180,39+notes.length*25):productionY-sectionY+39+standardLines.length*25;
+      if(!cash&&!taxInvoice){text('มาตรฐานการผลิตของโรงงาน',L,productionY+7,17,true,'left',INK);standardLines.forEach((value,i)=>text(value,L,productionY+39+i*25,16));}
+      const paymentY=sectionY+39+notes.length*25+(notes.length?12:0);
+      if(cash){
+        const cardY=paymentY,cardHeight=185;
+        rect(L,cardY,590,cardHeight,'#f3f7f6','#cbdedb');
+        line(L,cardY,L,cardY+cardHeight,INK,5);
+        text('ช่องทางการชำระเงิน',L+20,cardY+22,21,true,'left',INK);
+        cashPaymentLines.forEach((value,i)=>{
+          const parts=i?value.split('  เลขที่ '):[value];
+          text(parts[0],L+20,cardY+56+i*28,18,i===0,'left',i===0?INK:'#29384a');
+          if(i)text('เลขที่ '+parts[1],L+230,cardY+56+i*28,18,false,'left','#29384a');
+        });
+      }
+      const leftHeight=cash?39+notes.length*25+(notes.length?12:0)+185:taxInvoice?39+notes.length*25:productionY-sectionY+39+standardLines.length*25;
       const amountHeight=Math.max(amounts.length*45,leftHeight),amountRowHeight=amountHeight/amounts.length;
       amounts.forEach(([label,value],i)=>{const yy=sectionY+i*amountRowHeight,last=i===amounts.length-1,labelY=yy+(amountRowHeight-18)/2,valueY=yy+(amountRowHeight-19)/2;rect(713,yy,444,amountRowHeight,last?INK:'#ffffff');text(label,733,labelY,18,last,'left',last?'#ffffff':INK);text(money(value),1137,valueY,19,true,'right',last?'#ffffff':INK);});
       y=sectionY+amountHeight+28;
     }
-    (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:cash?[['ผู้รับเงิน','RECEIVED BY'],['ผู้จัดทำ','PREPARED BY'],['ลูกค้า / ผู้ชำระเงิน','CUSTOMER']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
+    (billing?[['ผู้วางบิล','PREPARED BY'],['ผู้รับวางบิล','RECEIVED BY'],['ผู้อนุมัติ','AUTHORIZED BY']]:cash?[['ผู้รับเงิน','RECEIVED BY'],['ผู้จัดทำ','PREPARED BY'],['ลูกค้า / ผู้ชำระเงิน','CUSTOMER']]:taxInvoice?[['ผู้จัดทำ','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ผู้รับเอกสาร','RECEIVED BY']]:[['ผู้เสนอราคา','PREPARED BY'],['ผู้อนุมัติ','AUTHORIZED BY'],['ลูกค้ายืนยันการสั่งซื้อ','ACCEPTED BY']]).forEach(([th,en],i)=>{const x=L+i*366;if(!billing)rect(x,y,342,161);line(x+20,y+76,x+322,y+76);text(th,x+171,y+89,18,true,'center');text(en,x+171,y+116,12,false,'center',MUTED);text('วันที่ ........ / ........ / ........',x+171,y+139,14,false,'center',MUTED);});
     pages.forEach((p,i)=>{page=p;line(L,1670,R,1670);text(title+' / '+english,L,1690,13,false,'left',MUTED);text((doc.document_number||'ตัวอย่าง')+'  |  หน้า '+(i+1)+' / '+pages.length,R,1690,13,false,'right',MUTED);});
     return pages;
   };
@@ -231,58 +247,5 @@
   window.QuotationLayout={build,toSVG,draw,prepare,styles};
   window.BillingLayout={billingDueDate,build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'ใบวางบิล')};
   window.CashBillLayout={build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'บิลเงินสด')};
-})();
-
-
-// Add the approved receiving account details to cash bill printouts.
-(() => {
-  const prepare = window.CashBillLayout.prepare;
-  const addReceivingAccounts = (pages, doc) => {
-    if (doc?.kind !== 'cash_bill' || !pages?.length) return pages;
-    const page = pages[pages.length - 1];
-    const total = page.find(command => command.type === 'rect' && command.x === 713 && command.w === 444);
-    if (!total) return pages;
-    const x = 83, y = total.y;
-    const lines = [
-      'ชื่อบัญชี  นางสาวเบญจมาศ สุภาษี',
-      'ธนาคารกสิกรไทย  เลขที่ 014-8-15927-0',
-      'ธนาคารกรุงเทพ  เลขที่ 030-7-231852',
-      'ธนาคารเกียรตินาคิน  เลขที่ 208-4-77636-5'
-    ];
-    page.push({type:'text',s:'ช่องทางการชำระเงิน',x,y:y+17,size:17,bold:true,align:'left',color:'#245b57'});
-    lines.forEach((s,i)=>page.push({type:'text',s,x,y:y+44+i*25,size:16,bold:false,align:'left',color:'#245b57'}));
-    return pages;
-  };
-  window.CashBillLayout.prepare = async (...args) => addReceivingAccounts(await prepare(...args), args[1]);
-  const build = window.CashBillLayout.build;
-  window.CashBillLayout.build = (...args) => addReceivingAccounts(build(...args), args[1]);
-})();
-
-
-// Enlarge and balance the cash-bill payment details block.
-(() => {
-  const decorate = (pages, doc) => {
-    if (doc?.kind !== 'cash_bill' || !pages?.length) return pages;
-    const page = pages[pages.length - 1];
-    const total = page.find(command => command.type === 'rect' && command.x === 713 && command.w === 444);
-    if (!total) return pages;
-    const lines = ['ชื่อบัญชี  นางสาวเบญจมาศ สุภาษี','ธนาคารกสิกรไทย  เลขที่ 014-8-15927-0','ธนาคารกรุงเทพ  เลขที่ 030-7-231852','ธนาคารเกียรตินาคิน  เลขที่ 208-4-77636-5'];
-    for (let i = page.length - 1; i >= 0; i--) {
-      const command = page[i];
-      if (command.type === 'text' && (command.s === 'ช่องทางการชำระเงิน' || lines.includes(command.s))) page.splice(i, 1);
-    }
-    const x = 83, y = total.y, w = 590, h = 180;
-    page.push({type:'rect',x,y,w,h,fill:'#f3f7f6',stroke:'#cbdedb'});
-    page.push({type:'line',x,y,x2:x,y2:y+h,color:'#245b57',width:5});
-    page.push({type:'text',s:'ช่องทางการชำระเงิน',x:x+20,y:y+24,size:21,bold:true,align:'left',color:'#245b57'});    lines.forEach((s,i)=>{
-      const parts = i ? s.split('  เลขที่ ') : [s];
-      page.push({type:'text',s:parts[0],x:x+20,y:y+58+i*28,size:18,bold:i===0,align:'left',color:'#29384a'});
-      if (i) page.push({type:'text',s:'เลขที่ '+parts[1],x:x+230,y:y+58+i*28,size:18,bold:false,align:'left',color:'#29384a'});
-    });
-    return pages;
-  };
-  const prepare = window.CashBillLayout.prepare;
-  window.CashBillLayout.prepare = async (...args) => decorate(await prepare(...args), args[1]);
-  const build = window.CashBillLayout.build;
-  window.CashBillLayout.build = (...args) => decorate(build(...args), args[1]);
+  window.TaxInvoiceLayout={build,draw,prepare,styles,toSVG:pages=>toSVG(pages,'ใบกำกับภาษี')};
 })();

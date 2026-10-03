@@ -29,7 +29,7 @@ window.buildSalesPDF = async (company, doc, items) => {
     }
   };
   const rule = () => { ctx.strokeStyle = '#cbd2db'; ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(width-margin, y); ctx.stroke(); y += 20; };
-  const documentLayout=doc.kind==='quotation'?window.QuotationLayout:doc.kind==='billing_note'?window.BillingLayout:doc.kind==='cash_bill'?window.CashBillLayout:null;
+  const documentLayout=doc.kind==='quotation'?window.QuotationLayout:doc.kind==='billing_note'?window.BillingLayout:doc.kind==='cash_bill'?window.CashBillLayout:doc.kind==='tax_invoice'?window.TaxInvoiceLayout:null;
   if(documentLayout){
     const layout=await documentLayout.prepare(company,doc,items);
     pages.push(...documentLayout.draw(layout,()=>document.createElement('canvas')));
