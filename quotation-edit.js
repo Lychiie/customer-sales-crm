@@ -78,7 +78,7 @@
   if(!context)return;
   document.querySelectorAll('#quotations tbody tr').forEach(row=>{
    const print=row.querySelector('[data-print-document]');if(!print||row.querySelector('[data-edit-quotation],[aria-label^="กู้คืนใบเสนอราคา"]'))return;
-   const number=print.dataset.printDocument,cell=row.lastElementChild;if(!number||!cell)return;
+   const number=row.cells[0]?.textContent.trim(),cell=row.lastElementChild;if(!number||!cell)return;
    const button=document.createElement('button');button.type='button';button.className='ghost';button.dataset.editQuotation=number;button.textContent='แก้ไข';button.setAttribute('aria-label','แก้ไขใบเสนอราคา '+number);button.style.marginRight='8px';button.onclick=()=>open(number);cell.prepend(button);
   });
  };
